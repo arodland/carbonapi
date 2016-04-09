@@ -1,4 +1,4 @@
-package main
+package expreval
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 	pickle "github.com/kisielk/og-rek"
 )
 
-type metricData struct {
+type MetricData struct {
 	pb.FetchResponse
 
 	// extra options
@@ -30,7 +30,7 @@ type metricData struct {
 	aggregatedValues []float64
 }
 
-func marshalCSV(results []*metricData) []byte {
+func MarshalCSV(results []*MetricData) []byte {
 
 	var b []byte
 
@@ -55,7 +55,7 @@ func marshalCSV(results []*metricData) []byte {
 	return b
 }
 
-func marshalJSON(results []*metricData) []byte {
+func MarshalJSON(results []*MetricData) []byte {
 
 	var b []byte
 	b = append(b, '[')
@@ -108,7 +108,7 @@ func marshalJSON(results []*metricData) []byte {
 	return b
 }
 
-func marshalPickle(results []*metricData) []byte {
+func MarshalPickle(results []*MetricData) []byte {
 
 	var p []map[string]interface{}
 
@@ -139,20 +139,17 @@ func marshalPickle(results []*metricData) []byte {
 	return buf.Bytes()
 }
 
-func marshalProtobuf(results []*metricData) []byte {
+func MarshalProtobuf(results []*MetricData) []byte {
 	response := pb.MultiFetchResponse{}
 	for _, metric := range results {
 		response.Metrics = append(response.Metrics, &((*metric).FetchResponse))
 	}
-	b, err := response.Marshal()
-	if err != nil {
-		logger.Logf("proto.Marshal: %v", err)
-	}
+	b, _ := response.Marshal()
 
 	return b
 }
 
-func marshalRaw(results []*metricData) []byte {
+func MarshalRaw(results []*MetricData) []byte {
 
 	var b []byte
 

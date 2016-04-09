@@ -1,4 +1,4 @@
-package main
+package expreval
 
 import (
 	"math"
@@ -106,36 +106,36 @@ func TestAlignToInterval(t *testing.T) {
 }
 
 func TestEvalExpr(t *testing.T) {
-	exp, _, err := parseExpr("summarize(metric1,'1min')")
+	exp, _, err := ParseExpr("summarize(metric1,'1min')")
 	if err != nil {
 		t.Errorf("error %s", err)
 	}
 
-	metricMap := make(map[metricRequest][]*metricData)
-	request := metricRequest{
-		metric: "metric1",
-		from:   1437127020,
-		until:  1437127140,
+	metricMap := make(map[MetricRequest][]*MetricData)
+	request := MetricRequest{
+		Metric: "metric1",
+		From:   1437127020,
+		Until:  1437127140,
 	}
 
 	stepTime := int32(60)
 
-	data := metricData{
+	data := MetricData{
 		FetchResponse: pb.FetchResponse{
-			Name:      &request.metric,
-			StartTime: &request.from,
-			StopTime:  &request.until,
+			Name:      &request.Metric,
+			StartTime: &request.From,
+			StopTime:  &request.Until,
 			StepTime:  &stepTime,
 			Values:    []float64{343, 407, 385},
 			IsAbsent:  []bool{false, false, false},
 		},
 	}
 
-	metricMap[request] = []*metricData{
+	metricMap[request] = []*MetricData{
 		&data,
 	}
 
-	evalExpr(exp, int32(request.from), int32(request.until), metricMap)
+	EvalExpr(exp, int32(request.From), int32(request.Until), metricMap)
 }
 
 func TestParseExpr(t *testing.T) {
@@ -386,7 +386,7 @@ func TestParseExpr(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		e, _, err := parseExpr(tt.s)
+		e, _, err := ParseExpr(tt.s)
 		if err != nil {
 			t.Errorf("parse for %+v failed: err=%v", tt.s, err)
 			continue
@@ -397,7 +397,7 @@ func TestParseExpr(t *testing.T) {
 	}
 }
 
-func makeResponse(name string, values []float64, step, start int32) *metricData {
+func makeResponse(name string, values []float64, step, start int32) *MetricData {
 
 	absent := make([]bool, len(values))
 
@@ -410,7 +410,7 @@ func makeResponse(name string, values []float64, step, start int32) *metricData 
 
 	stop := start + int32(len(values))*step
 
-	return &metricData{FetchResponse: pb.FetchResponse{
+	return &MetricData{FetchResponse: pb.FetchResponse{
 		Name:      proto.String(name),
 		Values:    values,
 		StartTime: proto.Int32(start),
@@ -426,15 +426,15 @@ func TestEvalExpression(t *testing.T) {
 
 	tests := []struct {
 		e    *expr
-		m    map[metricRequest][]*metricData
-		want []*metricData
+		m    map[MetricRequest][]*MetricData
+		want []*MetricData
 	}{
 		{
 			&expr{target: "metric"},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric", 0, 1}: []*metricData{makeResponse("metric", []float64{1, 2, 3, 4, 5}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric", 0, 1}: []*MetricData{makeResponse("metric", []float64{1, 2, 3, 4, 5}, 1, now32)},
 			},
-			[]*metricData{makeResponse("metric", []float64{1, 2, 3, 4, 5}, 1, now32)},
+			[]*MetricData{makeResponse("metric", []float64{1, 2, 3, 4, 5}, 1, now32)},
 		},
 		{
 			&expr{
@@ -446,12 +446,12 @@ func TestEvalExpression(t *testing.T) {
 					&expr{target: "metric3"}},
 				argString: "metric1,metric2,metric3",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, 2, 3, 4, 5, math.NaN()}, 1, now32)},
-				metricRequest{"metric2", 0, 1}: []*metricData{makeResponse("metric2", []float64{2, 3, math.NaN(), 5, 6, math.NaN()}, 1, now32)},
-				metricRequest{"metric3", 0, 1}: []*metricData{makeResponse("metric3", []float64{3, 4, 5, 6, math.NaN(), math.NaN()}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, 2, 3, 4, 5, math.NaN()}, 1, now32)},
+				MetricRequest{"metric2", 0, 1}: []*MetricData{makeResponse("metric2", []float64{2, 3, math.NaN(), 5, 6, math.NaN()}, 1, now32)},
+				MetricRequest{"metric3", 0, 1}: []*MetricData{makeResponse("metric3", []float64{3, 4, 5, 6, math.NaN(), math.NaN()}, 1, now32)},
 			},
-			[]*metricData{makeResponse("sumSeries(metric1,metric2,metric3)", []float64{6, 9, 8, 15, 11, math.NaN()}, 1, now32)},
+			[]*MetricData{makeResponse("sumSeries(metric1,metric2,metric3)", []float64{6, 9, 8, 15, 11, math.NaN()}, 1, now32)},
 		},
 		{
 			&expr{
@@ -463,10 +463,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,4",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, 1, 1, 1, 2, 2, 2, 4, 6, 4, 6, 8, math.NaN()}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, 1, 1, 1, 2, 2, 2, 4, 6, 4, 6, 8, math.NaN()}, 1, now32)},
 			},
-			[]*metricData{makeResponse("percentileOfSeries(metric1,4)", []float64{1, 1, 1, 1, 2, 2, 2, 4, 6, 4, 6, 8, math.NaN()}, 1, now32)},
+			[]*MetricData{makeResponse("percentileOfSeries(metric1,4)", []float64{1, 1, 1, 1, 2, 2, 2, 4, 6, 4, 6, 8, math.NaN()}, 1, now32)},
 		},
 		{
 			&expr{
@@ -478,15 +478,15 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1.foo.*.*,50",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1.foo.*.*", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1.foo.*.*", 0, 1}: []*MetricData{
 					makeResponse("metric1.foo.bar1.baz", []float64{1, 2, 3, 4, math.NaN(), math.NaN()}, 1, now32),
 					makeResponse("metric1.foo.bar1.qux", []float64{6, 7, 8, 9, 10, math.NaN()}, 1, now32),
 					makeResponse("metric1.foo.bar2.baz", []float64{11, 12, 13, 14, 15, math.NaN()}, 1, now32),
 					makeResponse("metric1.foo.bar2.qux", []float64{7, 8, 9, 10, 11, math.NaN()}, 1, now32),
 				},
 			},
-			[]*metricData{makeResponse("percentileOfSeries(metric1.foo.*.*,50)", []float64{7, 8, 9, 10, 11, math.NaN()}, 1, now32)},
+			[]*MetricData{makeResponse("percentileOfSeries(metric1.foo.*.*,50)", []float64{7, 8, 9, 10, 11, math.NaN()}, 1, now32)},
 		},
 		{
 			&expr{
@@ -501,15 +501,15 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1.foo.*.*,50,interpolate=true",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1.foo.*.*", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1.foo.*.*", 0, 1}: []*MetricData{
 					makeResponse("metric1.foo.bar1.baz", []float64{1, 2, 3, 4, math.NaN(), math.NaN()}, 1, now32),
 					makeResponse("metric1.foo.bar1.qux", []float64{6, 7, 8, 9, 10, math.NaN()}, 1, now32),
 					makeResponse("metric1.foo.bar2.baz", []float64{11, 12, 13, 14, 15, math.NaN()}, 1, now32),
 					makeResponse("metric1.foo.bar2.qux", []float64{7, 8, 9, 10, 11, math.NaN()}, 1, now32),
 				},
 			},
-			[]*metricData{makeResponse("percentileOfSeries(metric1.foo.*.*,50,interpolate=true)", []float64{6.5, 7.5, 8.5, 9.5, 11, math.NaN()}, 1, now32)},
+			[]*MetricData{makeResponse("percentileOfSeries(metric1.foo.*.*,50,interpolate=true)", []float64{6.5, 7.5, 8.5, 9.5, 11, math.NaN()}, 1, now32)},
 		},
 		{
 			&expr{
@@ -521,10 +521,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,50",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{2, 4, 6, 10, 14, 20, math.NaN()}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{2, 4, 6, 10, 14, 20, math.NaN()}, 1, now32)},
 			},
-			[]*metricData{makeResponse("nPercentile(metric1,50)", []float64{8, 8, 8, 8, 8, 8, 8}, 1, now32)},
+			[]*MetricData{makeResponse("nPercentile(metric1,50)", []float64{8, 8, 8, 8, 8, 8, 8}, 1, now32)},
 		},
 		{
 			&expr{
@@ -534,10 +534,10 @@ func TestEvalExpression(t *testing.T) {
 					&expr{target: "metric1"},
 				},
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{2, 4, 6, 10, 14, 20}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{2, 4, 6, 10, 14, 20}, 1, now32)},
 			},
-			[]*metricData{makeResponse("nonNegativeDerivative(metric1)", []float64{math.NaN(), 2, 2, 4, 4, 6}, 1, now32)},
+			[]*MetricData{makeResponse("nonNegativeDerivative(metric1)", []float64{math.NaN(), 2, 2, 4, 4, 6}, 1, now32)},
 		},
 		{
 			&expr{
@@ -547,10 +547,10 @@ func TestEvalExpression(t *testing.T) {
 					&expr{target: "metric1"},
 				},
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{2, 4, 6, 1, 4, math.NaN(), 8}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{2, 4, 6, 1, 4, math.NaN(), 8}, 1, now32)},
 			},
-			[]*metricData{makeResponse("nonNegativeDerivative(metric1)", []float64{math.NaN(), 2, 2, math.NaN(), 3, math.NaN(), math.NaN()}, 1, now32)},
+			[]*MetricData{makeResponse("nonNegativeDerivative(metric1)", []float64{math.NaN(), 2, 2, math.NaN(), 3, math.NaN(), math.NaN()}, 1, now32)},
 		},
 		{
 			&expr{
@@ -564,10 +564,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,maxValue=32",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{2, 4, 0, 10, 1, math.NaN(), 8, 40, 37}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{2, 4, 0, 10, 1, math.NaN(), 8, 40, 37}, 1, now32)},
 			},
-			[]*metricData{makeResponse("nonNegativeDerivative(metric1,32)", []float64{math.NaN(), 2, 29, 10, 24, math.NaN(), math.NaN(), 32, math.NaN()}, 1, now32)},
+			[]*MetricData{makeResponse("nonNegativeDerivative(metric1,32)", []float64{math.NaN(), 2, 29, 10, 24, math.NaN(), math.NaN(), 32, math.NaN()}, 1, now32)},
 		},
 		{
 			&expr{
@@ -578,10 +578,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{27, 19, math.NaN(), 10, 1, 100, 1.5, 10.20}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{27, 19, math.NaN(), 10, 1, 100, 1.5, 10.20}, 1, now32)},
 			},
-			[]*metricData{makeResponse("perSecond(metric1)", []float64{math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), 99, math.NaN(), 8.7}, 1, now32)},
+			[]*MetricData{makeResponse("perSecond(metric1)", []float64{math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), 99, math.NaN(), 8.7}, 1, now32)},
 		},
 		{
 			&expr{
@@ -593,10 +593,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,32",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{math.NaN(), 1, 2, 3, 4, 30, 0, 32, math.NaN()}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{math.NaN(), 1, 2, 3, 4, 30, 0, 32, math.NaN()}, 1, now32)},
 			},
-			[]*metricData{makeResponse("perSecond(metric1,32)", []float64{math.NaN(), math.NaN(), 1, 1, 1, 26, 3, 32, math.NaN()}, 1, now32)},
+			[]*MetricData{makeResponse("perSecond(metric1,32)", []float64{math.NaN(), math.NaN(), 1, 1, 1, 26, 3, 32, math.NaN()}, 1, now32)},
 		},
 		{
 			&expr{
@@ -608,10 +608,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,4",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, 1, 1, 1, 2, 2, 2, 4, 6, 4, 6, 8}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, 1, 1, 1, 2, 2, 2, 4, 6, 4, 6, 8}, 1, now32)},
 			},
-			[]*metricData{makeResponse("movingAverage(metric1,4)", []float64{math.NaN(), math.NaN(), math.NaN(), math.NaN(), 1, 1.25, 1.5, 1.75, 2.5, 3.5, 4, 5}, 1, now32)},
+			[]*MetricData{makeResponse("movingAverage(metric1,4)", []float64{math.NaN(), math.NaN(), math.NaN(), math.NaN(), 1, 1.25, 1.5, 1.75, 2.5, 3.5, 4, 5}, 1, now32)},
 		},
 		{
 			&expr{
@@ -623,10 +623,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,4",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, 1, 1, 1, 2, 2, 2, 4, 6, 4, 6, 8}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, 1, 1, 1, 2, 2, 2, 4, 6, 4, 6, 8}, 1, now32)},
 			},
-			[]*metricData{makeResponse("movingMedian(metric1,4)", []float64{math.NaN(), math.NaN(), math.NaN(), 1, 1, 1.5, 2, 2, 3, 4, 5, 6}, 1, now32)},
+			[]*MetricData{makeResponse("movingMedian(metric1,4)", []float64{math.NaN(), math.NaN(), math.NaN(), 1, 1, 1.5, 2, 2, 3, 4, 5, 6}, 1, now32)},
 		},
 		{
 			&expr{
@@ -638,10 +638,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,5",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, 1, 1, 1, 2, 2, 2, 4, 6, 4, 6, 8, 1, 2, math.NaN()}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, 1, 1, 1, 2, 2, 2, 4, 6, 4, 6, 8, 1, 2, math.NaN()}, 1, now32)},
 			},
-			[]*metricData{makeResponse("movingMedian(metric1,5)", []float64{math.NaN(), math.NaN(), math.NaN(), math.NaN(), 1, 1, 2, 2, 2, 4, 4, 6, 6, 4, 2}, 1, now32)},
+			[]*MetricData{makeResponse("movingMedian(metric1,5)", []float64{math.NaN(), math.NaN(), math.NaN(), math.NaN(), 1, 1, 2, 2, 2, 4, 4, 6, 6, 4, 2}, 1, now32)},
 		},
 		{
 			&expr{
@@ -653,10 +653,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,1s",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, 1, 1, 1, 2, 2, 2, 4, 6, 4, 6, 8, 1, 2, math.NaN()}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, 1, 1, 1, 2, 2, 2, 4, 6, 4, 6, 8, 1, 2, math.NaN()}, 1, now32)},
 			},
-			[]*metricData{makeResponse("movingMedian(metric1,1)", []float64{1, 1, 1, 1, 2, 2, 2, 4, 6, 4, 6, 8, 1, 2, math.NaN()}, 1, now32)},
+			[]*MetricData{makeResponse("movingMedian(metric1,1)", []float64{1, 1, 1, 1, 2, 2, 2, 4, 6, 4, 6, 8, 1, 2, math.NaN()}, 1, now32)},
 		},
 		{
 			&expr{
@@ -668,10 +668,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,1min",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, 1, 1, 1, 2, 2, 2, 4, 6, 4, 6, 8, 1, 2, math.NaN()}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, 1, 1, 1, 2, 2, 2, 4, 6, 4, 6, 8, 1, 2, math.NaN()}, 1, now32)},
 			},
-			[]*metricData{makeResponse("movingMedian(metric1,60)", []float64{math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN()}, 1, now32)},
+			[]*MetricData{makeResponse("movingMedian(metric1,60)", []float64{math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN()}, 1, now32)},
 		},
 		{
 			&expr{
@@ -684,11 +684,11 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,metric2,6",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{43, 21, 25, 42, 57, 59}, 1, now32)},
-				metricRequest{"metric2", 0, 1}: []*metricData{makeResponse("metric2", []float64{99, 65, 79, 75, 87, 81}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{43, 21, 25, 42, 57, 59}, 1, now32)},
+				MetricRequest{"metric2", 0, 1}: []*MetricData{makeResponse("metric2", []float64{99, 65, 79, 75, 87, 81}, 1, now32)},
 			},
-			[]*metricData{makeResponse("pearson(metric1,metric2,6)", []float64{math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), 0.5298089018901744}, 1, now32)},
+			[]*MetricData{makeResponse("pearson(metric1,metric2,6)", []float64{math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), 0.5298089018901744}, 1, now32)},
 		},
 		{
 			&expr{
@@ -700,10 +700,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,2.5",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, 2, math.NaN(), 4, 5}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, 2, math.NaN(), 4, 5}, 1, now32)},
 			},
-			[]*metricData{makeResponse("scale(metric1,2.5)", []float64{2.5, 5.0, math.NaN(), 10.0, 12.5}, 1, now32)},
+			[]*MetricData{makeResponse("scale(metric1,2.5)", []float64{2.5, 5.0, math.NaN(), 10.0, 12.5}, 1, now32)},
 		},
 		{
 			&expr{
@@ -715,10 +715,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,5",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{60, 120, math.NaN(), 120, 120}, 60, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{60, 120, math.NaN(), 120, 120}, 60, now32)},
 			},
-			[]*metricData{makeResponse("scaleToSeconds(metric1,5)", []float64{5, 10, math.NaN(), 10, 10}, 1, now32)},
+			[]*MetricData{makeResponse("scaleToSeconds(metric1,5)", []float64{5, 10, math.NaN(), 10, 10}, 1, now32)},
 		},
 		{
 			&expr{
@@ -730,10 +730,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,3",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{5, 1, math.NaN(), 0, 12, 125, 10.4, 1.1}, 60, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{5, 1, math.NaN(), 0, 12, 125, 10.4, 1.1}, 60, now32)},
 			},
-			[]*metricData{makeResponse("pow(metric1,3)", []float64{125, 1, math.NaN(), 0, 1728, 1953125, 1124.864, 1.331}, 1, now32)},
+			[]*MetricData{makeResponse("pow(metric1,3)", []float64{125, 1, math.NaN(), 0, 1728, 1953125, 1124.864, 1.331}, 1, now32)},
 		},
 		{
 			&expr{
@@ -747,10 +747,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,limit=3",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{math.NaN(), 2, math.NaN(), math.NaN(), math.NaN(), math.NaN(), 4, 5}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{math.NaN(), 2, math.NaN(), math.NaN(), math.NaN(), math.NaN(), 4, 5}, 1, now32)},
 			},
-			[]*metricData{makeResponse("keepLastValue(metric1,3)", []float64{math.NaN(), 2, 2, 2, 2, math.NaN(), 4, 5}, 1, now32)},
+			[]*MetricData{makeResponse("keepLastValue(metric1,3)", []float64{math.NaN(), 2, 2, 2, 2, math.NaN(), 4, 5}, 1, now32)},
 		},
 
 		{
@@ -762,10 +762,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{math.NaN(), 2, math.NaN(), math.NaN(), math.NaN(), math.NaN(), 4, 5}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{math.NaN(), 2, math.NaN(), math.NaN(), math.NaN(), math.NaN(), 4, 5}, 1, now32)},
 			},
-			[]*metricData{makeResponse("keepLastValue(metric1)", []float64{math.NaN(), 2, 2, 2, 2, 2, 4, 5}, 1, now32)},
+			[]*MetricData{makeResponse("keepLastValue(metric1)", []float64{math.NaN(), 2, 2, 2, 2, 2, 4, 5}, 1, now32)},
 		},
 		{
 			&expr{
@@ -776,10 +776,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{math.NaN(), math.NaN(), math.NaN(), math.NaN(), 0, 0, 0, math.NaN(), math.NaN(), 1, 1, 2, 3, 4, 4, 5, 5, 5, 6, 7}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{math.NaN(), math.NaN(), math.NaN(), math.NaN(), 0, 0, 0, math.NaN(), math.NaN(), 1, 1, 2, 3, 4, 4, 5, 5, 5, 6, 7}, 1, now32)},
 			},
-			[]*metricData{makeResponse("changed(metric1)",
+			[]*MetricData{makeResponse("changed(metric1)",
 				[]float64{0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 1}, 1, now32)},
 		},
 		{
@@ -791,10 +791,10 @@ func TestEvalExpression(t *testing.T) {
 					&expr{valStr: "renamed", etype: etString},
 				},
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, 2, 3, 4, 5}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, 2, 3, 4, 5}, 1, now32)},
 			},
-			[]*metricData{makeResponse("renamed",
+			[]*MetricData{makeResponse("renamed",
 				[]float64{1, 2, 3, 4, 5}, 1, now32)},
 		},
 		{
@@ -805,10 +805,10 @@ func TestEvalExpression(t *testing.T) {
 					&expr{target: "metric1.foo.bar.baz"},
 				},
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1.foo.bar.baz", 0, 1}: []*metricData{makeResponse("metric1.foo.bar.baz", []float64{1, 2, 3, 4, 5}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1.foo.bar.baz", 0, 1}: []*MetricData{makeResponse("metric1.foo.bar.baz", []float64{1, 2, 3, 4, 5}, 1, now32)},
 			},
-			[]*metricData{makeResponse("baz", []float64{1, 2, 3, 4, 5}, 1, now32)},
+			[]*MetricData{makeResponse("baz", []float64{1, 2, 3, 4, 5}, 1, now32)},
 		},
 		{
 			&expr{
@@ -819,10 +819,10 @@ func TestEvalExpression(t *testing.T) {
 					&expr{val: 1, etype: etConst},
 				},
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1.foo.bar.baz", 0, 1}: []*metricData{makeResponse("metric1.foo.bar.baz", []float64{1, 2, 3, 4, 5}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1.foo.bar.baz", 0, 1}: []*MetricData{makeResponse("metric1.foo.bar.baz", []float64{1, 2, 3, 4, 5}, 1, now32)},
 			},
-			[]*metricData{makeResponse("foo", []float64{1, 2, 3, 4, 5}, 1, now32)},
+			[]*MetricData{makeResponse("foo", []float64{1, 2, 3, 4, 5}, 1, now32)},
 		},
 		{
 			&expr{
@@ -834,10 +834,10 @@ func TestEvalExpression(t *testing.T) {
 					&expr{val: 3, etype: etConst},
 				},
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1.foo.bar.baz", 0, 1}: []*metricData{makeResponse("metric1.foo.bar.baz", []float64{1, 2, 3, 4, 5}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1.foo.bar.baz", 0, 1}: []*MetricData{makeResponse("metric1.foo.bar.baz", []float64{1, 2, 3, 4, 5}, 1, now32)},
 			},
-			[]*metricData{makeResponse("foo.baz",
+			[]*MetricData{makeResponse("foo.baz",
 				[]float64{1, 2, 3, 4, 5}, 1, now32)},
 		},
 		{
@@ -850,10 +850,10 @@ func TestEvalExpression(t *testing.T) {
 					&expr{val: -2, etype: etConst},
 				},
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1.foo.bar.baz", 0, 1}: []*metricData{makeResponse("metric1.foo.bar.baz", []float64{1, 2, 3, 4, 5}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1.foo.bar.baz", 0, 1}: []*MetricData{makeResponse("metric1.foo.bar.baz", []float64{1, 2, 3, 4, 5}, 1, now32)},
 			},
-			[]*metricData{makeResponse("foo.bar",
+			[]*MetricData{makeResponse("foo.bar",
 				[]float64{1, 2, 3, 4, 5}, 1, now32)},
 		},
 		{
@@ -866,10 +866,10 @@ func TestEvalExpression(t *testing.T) {
 					&expr{valStr: "replaced", etype: etString},
 				},
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1.foo.bar.baz", 0, 1}: []*metricData{makeResponse("metric1.foo.bar.baz", []float64{1, 2, 3, 4, 5}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1.foo.bar.baz", 0, 1}: []*MetricData{makeResponse("metric1.foo.bar.baz", []float64{1, 2, 3, 4, 5}, 1, now32)},
 			},
-			[]*metricData{makeResponse("metric1.replaced.bar.baz",
+			[]*MetricData{makeResponse("metric1.replaced.bar.baz",
 				[]float64{1, 2, 3, 4, 5}, 1, now32)},
 		},
 		{
@@ -882,10 +882,10 @@ func TestEvalExpression(t *testing.T) {
 					&expr{valStr: "$1", etype: etString},
 				},
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1.TCP100", 0, 1}: []*metricData{makeResponse("metric1.TCP100", []float64{1, 2, 3, 4, 5}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1.TCP100", 0, 1}: []*MetricData{makeResponse("metric1.TCP100", []float64{1, 2, 3, 4, 5}, 1, now32)},
 			},
-			[]*metricData{makeResponse("100",
+			[]*MetricData{makeResponse("100",
 				[]float64{1, 2, 3, 4, 5}, 1, now32)},
 		},
 		{
@@ -896,10 +896,10 @@ func TestEvalExpression(t *testing.T) {
 					&expr{target: "metric1"},
 				},
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{2, 4, 6, 1, 4, math.NaN(), 8}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{2, 4, 6, 1, 4, math.NaN(), 8}, 1, now32)},
 			},
-			[]*metricData{makeResponse("derivative(metric1)",
+			[]*MetricData{makeResponse("derivative(metric1)",
 				[]float64{math.NaN(), 2, 2, -5, 3, math.NaN(), 4}, 1, now32)},
 		},
 		{
@@ -912,12 +912,12 @@ func TestEvalExpression(t *testing.T) {
 					&expr{target: "metric3"}},
 				argString: "metric1,metric2,metric3",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, math.NaN(), 2, 3, 4, 5}, 1, now32)},
-				metricRequest{"metric2", 0, 1}: []*metricData{makeResponse("metric2", []float64{2, math.NaN(), 3, math.NaN(), 5, 6}, 1, now32)},
-				metricRequest{"metric3", 0, 1}: []*metricData{makeResponse("metric3", []float64{3, math.NaN(), 4, 5, 6, math.NaN()}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, math.NaN(), 2, 3, 4, 5}, 1, now32)},
+				MetricRequest{"metric2", 0, 1}: []*MetricData{makeResponse("metric2", []float64{2, math.NaN(), 3, math.NaN(), 5, 6}, 1, now32)},
+				MetricRequest{"metric3", 0, 1}: []*MetricData{makeResponse("metric3", []float64{3, math.NaN(), 4, 5, 6, math.NaN()}, 1, now32)},
 			},
-			[]*metricData{makeResponse("averageSeries(metric1,metric2,metric3)",
+			[]*MetricData{makeResponse("averageSeries(metric1,metric2,metric3)",
 				[]float64{2, math.NaN(), 3, 4, 5, 5.5}, 1, now32)},
 		},
 		{
@@ -930,12 +930,12 @@ func TestEvalExpression(t *testing.T) {
 					&expr{target: "metric3"}},
 				argString: "metric1,metric2,metric3",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, math.NaN(), 2, 3, 4, 5}, 1, now32)},
-				metricRequest{"metric2", 0, 1}: []*metricData{makeResponse("metric2", []float64{2, math.NaN(), 3, math.NaN(), 5, 6}, 1, now32)},
-				metricRequest{"metric3", 0, 1}: []*metricData{makeResponse("metric3", []float64{3, math.NaN(), 4, 5, 6, math.NaN()}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, math.NaN(), 2, 3, 4, 5}, 1, now32)},
+				MetricRequest{"metric2", 0, 1}: []*MetricData{makeResponse("metric2", []float64{2, math.NaN(), 3, math.NaN(), 5, 6}, 1, now32)},
+				MetricRequest{"metric3", 0, 1}: []*MetricData{makeResponse("metric3", []float64{3, math.NaN(), 4, 5, 6, math.NaN()}, 1, now32)},
 			},
-			[]*metricData{makeResponse("maxSeries(metric1,metric2,metric3)",
+			[]*MetricData{makeResponse("maxSeries(metric1,metric2,metric3)",
 				[]float64{3, math.NaN(), 4, 5, 6, 6}, 1, now32)},
 		},
 		{
@@ -948,12 +948,12 @@ func TestEvalExpression(t *testing.T) {
 					&expr{target: "metric3"}},
 				argString: "metric1,metric2,metric3",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, math.NaN(), 2, 3, 4, 5}, 1, now32)},
-				metricRequest{"metric2", 0, 1}: []*metricData{makeResponse("metric2", []float64{2, math.NaN(), 3, math.NaN(), 5, 6}, 1, now32)},
-				metricRequest{"metric3", 0, 1}: []*metricData{makeResponse("metric3", []float64{3, math.NaN(), 4, 5, 6, math.NaN()}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, math.NaN(), 2, 3, 4, 5}, 1, now32)},
+				MetricRequest{"metric2", 0, 1}: []*MetricData{makeResponse("metric2", []float64{2, math.NaN(), 3, math.NaN(), 5, 6}, 1, now32)},
+				MetricRequest{"metric3", 0, 1}: []*MetricData{makeResponse("metric3", []float64{3, math.NaN(), 4, 5, 6, math.NaN()}, 1, now32)},
 			},
-			[]*metricData{makeResponse("minSeries(metric1,metric2,metric3)",
+			[]*MetricData{makeResponse("minSeries(metric1,metric2,metric3)",
 				[]float64{1, math.NaN(), 2, 3, 4, 5}, 1, now32)},
 		},
 		{
@@ -966,11 +966,11 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,metric2",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, math.NaN(), math.NaN(), 3, 4, 12}, 1, now32)},
-				metricRequest{"metric2", 0, 1}: []*metricData{makeResponse("metric2", []float64{2, math.NaN(), 3, math.NaN(), 0, 6}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, math.NaN(), math.NaN(), 3, 4, 12}, 1, now32)},
+				MetricRequest{"metric2", 0, 1}: []*MetricData{makeResponse("metric2", []float64{2, math.NaN(), 3, math.NaN(), 0, 6}, 1, now32)},
 			},
-			[]*metricData{makeResponse("asPercent(metric1,metric2)",
+			[]*MetricData{makeResponse("asPercent(metric1,metric2)",
 				[]float64{50, math.NaN(), math.NaN(), math.NaN(), math.NaN(), 200}, 1, now32)},
 		},
 		{
@@ -983,11 +983,11 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,metric2",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, math.NaN(), math.NaN(), 3, 4, 12}, 1, now32)},
-				metricRequest{"metric2", 0, 1}: []*metricData{makeResponse("metric2", []float64{2, math.NaN(), 3, math.NaN(), 0, 6}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, math.NaN(), math.NaN(), 3, 4, 12}, 1, now32)},
+				MetricRequest{"metric2", 0, 1}: []*MetricData{makeResponse("metric2", []float64{2, math.NaN(), 3, math.NaN(), 0, 6}, 1, now32)},
 			},
-			[]*metricData{makeResponse("divideSeries(metric1,metric2)",
+			[]*MetricData{makeResponse("divideSeries(metric1,metric2)",
 				[]float64{0.5, math.NaN(), math.NaN(), math.NaN(), math.NaN(), 2}, 1, now32)},
 		},
 		{
@@ -999,13 +999,13 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric[12]",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric[12]", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric[12]", 0, 1}: []*MetricData{
 					makeResponse("metric1", []float64{1, math.NaN(), math.NaN(), 3, 4, 12}, 1, now32),
 					makeResponse("metric2", []float64{2, math.NaN(), 3, math.NaN(), 0, 6}, 1, now32),
 				},
 			},
-			[]*metricData{makeResponse("divideSeries(metric[12])",
+			[]*MetricData{makeResponse("divideSeries(metric[12])",
 				[]float64{0.5, math.NaN(), math.NaN(), math.NaN(), math.NaN(), 2}, 1, now32)},
 		},
 		{
@@ -1018,11 +1018,11 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,metric2",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, math.NaN(), math.NaN(), 3, 4, 12}, 1, now32)},
-				metricRequest{"metric2", 0, 1}: []*metricData{makeResponse("metric2", []float64{2, math.NaN(), 3, math.NaN(), 0, 6}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, math.NaN(), math.NaN(), 3, 4, 12}, 1, now32)},
+				MetricRequest{"metric2", 0, 1}: []*MetricData{makeResponse("metric2", []float64{2, math.NaN(), 3, math.NaN(), 0, 6}, 1, now32)},
 			},
-			[]*metricData{makeResponse("multiplySeries(metric1,metric2)",
+			[]*MetricData{makeResponse("multiplySeries(metric1,metric2)",
 				[]float64{2, math.NaN(), math.NaN(), math.NaN(), 0, 72}, 1, now32)},
 		},
 		{
@@ -1035,11 +1035,11 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric[12]",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, math.NaN(), math.NaN(), 3, 4, 12}, 1, now32)},
-				metricRequest{"metric2", 0, 1}: []*metricData{makeResponse("metric2", []float64{2, math.NaN(), 3, math.NaN(), 0, 6}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, math.NaN(), math.NaN(), 3, 4, 12}, 1, now32)},
+				MetricRequest{"metric2", 0, 1}: []*MetricData{makeResponse("metric2", []float64{2, math.NaN(), 3, math.NaN(), 0, 6}, 1, now32)},
 			},
-			[]*metricData{makeResponse("multiplySeries(metric[12])",
+			[]*MetricData{makeResponse("multiplySeries(metric[12])",
 				[]float64{2, math.NaN(), math.NaN(), math.NaN(), 0, 72}, 1, now32)},
 		},
 		{
@@ -1053,12 +1053,12 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,metric2,metric3",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, math.NaN(), math.NaN(), 3, 4, 12}, 1, now32)},
-				metricRequest{"metric2", 0, 1}: []*metricData{makeResponse("metric2", []float64{2, math.NaN(), 3, math.NaN(), 0, 6}, 1, now32)},
-				metricRequest{"metric3", 0, 1}: []*metricData{makeResponse("metric3", []float64{3, math.NaN(), 4, math.NaN(), 7, 8}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, math.NaN(), math.NaN(), 3, 4, 12}, 1, now32)},
+				MetricRequest{"metric2", 0, 1}: []*MetricData{makeResponse("metric2", []float64{2, math.NaN(), 3, math.NaN(), 0, 6}, 1, now32)},
+				MetricRequest{"metric3", 0, 1}: []*MetricData{makeResponse("metric3", []float64{3, math.NaN(), 4, math.NaN(), 7, 8}, 1, now32)},
 			},
-			[]*metricData{makeResponse("multiplySeries(metric1,metric2,metric3)",
+			[]*MetricData{makeResponse("multiplySeries(metric1,metric2,metric3)",
 				[]float64{6, math.NaN(), math.NaN(), math.NaN(), 0, 576}, 1, now32)},
 		},
 		{
@@ -1071,11 +1071,11 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,metric2",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, math.NaN(), math.NaN(), 3, 4, 12}, 1, now32)},
-				metricRequest{"metric2", 0, 1}: []*metricData{makeResponse("metric2", []float64{2, math.NaN(), 3, math.NaN(), 0, 6}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, math.NaN(), math.NaN(), 3, 4, 12}, 1, now32)},
+				MetricRequest{"metric2", 0, 1}: []*MetricData{makeResponse("metric2", []float64{2, math.NaN(), 3, math.NaN(), 0, 6}, 1, now32)},
 			},
-			[]*metricData{makeResponse("diffSeries(metric1,metric2)",
+			[]*MetricData{makeResponse("diffSeries(metric1,metric2)",
 				[]float64{-1, math.NaN(), math.NaN(), 3, 4, 6}, 1, now32)},
 		},
 		{
@@ -1089,12 +1089,12 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,metric2,metric3",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{5, math.NaN(), math.NaN(), 3, 4, 12}, 1, now32)},
-				metricRequest{"metric2", 0, 1}: []*metricData{makeResponse("metric2", []float64{3, math.NaN(), 3, math.NaN(), 0, 7}, 1, now32)},
-				metricRequest{"metric3", 0, 1}: []*metricData{makeResponse("metric3", []float64{1, math.NaN(), 3, math.NaN(), 0, 4}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{5, math.NaN(), math.NaN(), 3, 4, 12}, 1, now32)},
+				MetricRequest{"metric2", 0, 1}: []*MetricData{makeResponse("metric2", []float64{3, math.NaN(), 3, math.NaN(), 0, 7}, 1, now32)},
+				MetricRequest{"metric3", 0, 1}: []*MetricData{makeResponse("metric3", []float64{1, math.NaN(), 3, math.NaN(), 0, 4}, 1, now32)},
 			},
-			[]*metricData{makeResponse("diffSeries(metric1,metric2,metric3)",
+			[]*MetricData{makeResponse("diffSeries(metric1,metric2,metric3)",
 				[]float64{1, math.NaN(), math.NaN(), 3, 4, 1}, 1, now32)},
 		},
 		{
@@ -1106,13 +1106,13 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric*",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric*", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric*", 0, 1}: []*MetricData{
 					makeResponse("metric1", []float64{1, math.NaN(), math.NaN(), 3, 4, 12}, 1, now32),
 					makeResponse("metric2", []float64{2, math.NaN(), 3, math.NaN(), 0, 6}, 1, now32),
 				},
 			},
-			[]*metricData{makeResponse("diffSeries(metric*)",
+			[]*MetricData{makeResponse("diffSeries(metric*)",
 				[]float64{-1, math.NaN(), math.NaN(), 3, 4, 6}, 1, now32)},
 		},
 		{
@@ -1124,14 +1124,14 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric*",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric*", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric*", 0, 1}: []*MetricData{
 					makeResponse("metric1", []float64{math.NaN(), math.NaN(), math.NaN(), 3, 4, 12, -10}, 1, now32),
 					makeResponse("metric2", []float64{2, math.NaN(), math.NaN(), 15, 0, 6, 10}, 1, now32),
 					makeResponse("metric3", []float64{1, 2, math.NaN(), 4, 5, 6, 7}, 1, now32),
 				},
 			},
-			[]*metricData{makeResponse("rangeOfSeries(metric*)",
+			[]*MetricData{makeResponse("rangeOfSeries(metric*)",
 				[]float64{1, math.NaN(), math.NaN(), 12, 5, 6, 20}, 1, now32)},
 		},
 		{
@@ -1143,10 +1143,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, math.NaN(), math.NaN(), 3, 4, 12}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, math.NaN(), math.NaN(), 3, 4, 12}, 1, now32)},
 			},
-			[]*metricData{makeResponse("transformNull(metric1)",
+			[]*MetricData{makeResponse("transformNull(metric1)",
 				[]float64{1, 0, 0, 3, 4, 12}, 1, now32)},
 		},
 		{
@@ -1161,10 +1161,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,default=5",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, math.NaN(), math.NaN(), 3, 4, 12}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, math.NaN(), math.NaN(), 3, 4, 12}, 1, now32)},
 			},
-			[]*metricData{makeResponse("transformNull(metric1,5)",
+			[]*MetricData{makeResponse("transformNull(metric1,5)",
 				[]float64{1, 5, 5, 3, 4, 12}, 1, now32)},
 		},
 		{
@@ -1177,14 +1177,14 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,1",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{
 					makeResponse("metricA", []float64{1, 1, 3, 3, 12, 11}, 1, now32),
 					makeResponse("metricB", []float64{1, 1, 3, 3, 4, 1}, 1, now32),
 					makeResponse("metricC", []float64{1, 1, 3, 3, 4, 10}, 1, now32),
 				},
 			},
-			[]*metricData{makeResponse("metricA", // NOTE(dgryski): not sure if this matches graphite
+			[]*MetricData{makeResponse("metricA", // NOTE(dgryski): not sure if this matches graphite
 				[]float64{1, 1, 3, 3, 12, 11}, 1, now32)},
 		},
 		{
@@ -1197,14 +1197,14 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,1",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{
 					makeResponse("metricA", []float64{1, 1, 3, 3, 4, 12}, 1, now32),
 					makeResponse("metricB", []float64{1, 1, 3, 3, 4, 1}, 1, now32),
 					makeResponse("metricC", []float64{1, 1, 3, 3, 4, 15}, 1, now32),
 				},
 			},
-			[]*metricData{makeResponse("metricB", // NOTE(dgryski): not sure if this matches graphite
+			[]*MetricData{makeResponse("metricB", // NOTE(dgryski): not sure if this matches graphite
 				[]float64{1, 1, 3, 3, 4, 1}, 1, now32)},
 		},
 		{
@@ -1217,15 +1217,15 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,1",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{
 					makeResponse("metric0", []float64{math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN()}, 1, now32),
 					makeResponse("metricA", []float64{1, 1, 3, 3, 4, 12}, 1, now32),
 					makeResponse("metricB", []float64{1, 1, 3, 3, 4, 1}, 1, now32),
 					makeResponse("metricC", []float64{1, 1, 3, 3, 4, 15}, 1, now32),
 				},
 			},
-			[]*metricData{makeResponse("metricC", // NOTE(dgryski): not sure if this matches graphite
+			[]*MetricData{makeResponse("metricC", // NOTE(dgryski): not sure if this matches graphite
 				[]float64{1, 1, 3, 3, 4, 15}, 1, now32)},
 		},
 		{
@@ -1238,14 +1238,14 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,1",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{
 					makeResponse("metricA", []float64{1, 1, 3, 3, 4, 12}, 1, now32),
 					makeResponse("metricB", []float64{1, 5, 5, 5, 5, 5}, 1, now32),
 					makeResponse("metricC", []float64{1, 1, 3, 3, 4, 10}, 1, now32),
 				},
 			},
-			[]*metricData{makeResponse("metricB", // NOTE(dgryski): not sure if this matches graphite
+			[]*MetricData{makeResponse("metricB", // NOTE(dgryski): not sure if this matches graphite
 				[]float64{1, 5, 5, 5, 5, 5}, 1, now32)},
 		},
 		{
@@ -1258,14 +1258,14 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,'(Foo|Baz)'",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{
 					makeResponse("metricFoo", []float64{1, 1, 1, 1, 1}, 1, now32),
 					makeResponse("metricBar", []float64{2, 2, 2, 2, 2}, 1, now32),
 					makeResponse("metricBaz", []float64{3, 3, 3, 3, 3}, 1, now32),
 				},
 			},
-			[]*metricData{makeResponse("metricBar", // NOTE(dgryski): not sure if this matches graphite
+			[]*MetricData{makeResponse("metricBar", // NOTE(dgryski): not sure if this matches graphite
 				[]float64{2, 2, 2, 2, 2}, 1, now32)},
 		},
 		{
@@ -1278,10 +1278,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,0.1",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{0, 1, 1, 1, math.NaN(), 1, 1}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{0, 1, 1, 1, math.NaN(), 1, 1}, 1, now32)},
 			},
-			[]*metricData{
+			[]*MetricData{
 				makeResponse("ewma(metric1,0.1)", []float64{0, 0.9, 0.99, 0.999, math.NaN(), 0.9999, 0.99999}, 1, now32),
 			},
 		},
@@ -1295,10 +1295,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,0.1",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{0, 1, 1, 1, math.NaN(), 1, 1}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{0, 1, 1, 1, math.NaN(), 1, 1}, 1, now32)},
 			},
-			[]*metricData{
+			[]*MetricData{
 				makeResponse("ewma(metric1,0.1)", []float64{0, 0.9, 0.99, 0.999, math.NaN(), 0.9999, 0.99999}, 1, now32),
 			},
 		},
@@ -1312,14 +1312,14 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,'Bar'",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{
 					makeResponse("metricFoo", []float64{1, 1, 1, 1, 1}, 1, now32),
 					makeResponse("metricBar", []float64{2, 2, 2, 2, 2}, 1, now32),
 					makeResponse("metricBaz", []float64{3, 3, 3, 3, 3}, 1, now32),
 				},
 			},
-			[]*metricData{makeResponse("metricBar", // NOTE(dgryski): not sure if this matches graphite
+			[]*MetricData{makeResponse("metricBar", // NOTE(dgryski): not sure if this matches graphite
 				[]float64{2, 2, 2, 2, 2}, 1, now32)},
 		},
 		{
@@ -1331,10 +1331,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, 10, 100, 1000, 10000}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, 10, 100, 1000, 10000}, 1, now32)},
 			},
-			[]*metricData{makeResponse("logarithm(metric1)",
+			[]*MetricData{makeResponse("logarithm(metric1)",
 				[]float64{0, 1, 2, 3, 4}, 1, now32)},
 		},
 		{
@@ -1349,10 +1349,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,base=2",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, 2, 4, 8, 16, 32}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, 2, 4, 8, 16, 32}, 1, now32)},
 			},
-			[]*metricData{makeResponse("logarithm(metric1,2)",
+			[]*MetricData{makeResponse("logarithm(metric1,2)",
 				[]float64{0, 1, 2, 3, 4, 5}, 1, now32)},
 		},
 		{
@@ -1364,10 +1364,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{0, -1, 2, -3, 4, 5}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{0, -1, 2, -3, 4, 5}, 1, now32)},
 			},
-			[]*metricData{makeResponse("absolute(metric1)",
+			[]*MetricData{makeResponse("absolute(metric1)",
 				[]float64{0, 1, 2, 3, 4, 5}, 1, now32)},
 		},
 		{
@@ -1379,10 +1379,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{math.NaN(), -1, math.NaN(), -3, 4, 5}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{math.NaN(), -1, math.NaN(), -3, 4, 5}, 1, now32)},
 			},
-			[]*metricData{makeResponse("isNonNull(metric1)",
+			[]*MetricData{makeResponse("isNonNull(metric1)",
 				[]float64{0, 1, 0, 1, 1, 1}, 1, now32)},
 		},
 		{
@@ -1395,14 +1395,14 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,5",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{
 					makeResponse("metricA", []float64{0, 0, 0, 0, 0, 0}, 1, now32),
 					makeResponse("metricB", []float64{3, 4, 5, 6, 7, 8}, 1, now32),
 					makeResponse("metricC", []float64{4, 4, 5, 5, 6, 6}, 1, now32),
 				},
 			},
-			[]*metricData{
+			[]*MetricData{
 				makeResponse("metricB", []float64{3, 4, 5, 6, 7, 8}, 1, now32),
 				makeResponse("metricC", []float64{4, 4, 5, 5, 6, 6}, 1, now32),
 			},
@@ -1417,14 +1417,14 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,0",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{
 					makeResponse("metricA", []float64{0, 0, 0, 0, 0, 0}, 1, now32),
 					makeResponse("metricB", []float64{3, 4, 5, 6, 7, 8}, 1, now32),
 					makeResponse("metricC", []float64{0, 4, 4, 5, 5, 6}, 1, now32),
 				},
 			},
-			[]*metricData{makeResponse("metricA",
+			[]*MetricData{makeResponse("metricA",
 				[]float64{0, 0, 0, 0, 0, 0}, 1, now32)},
 		},
 		{
@@ -1437,14 +1437,14 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,6",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{
 					makeResponse("metricA", []float64{0, 0, 0, 0, 0, 0}, 1, now32),
 					makeResponse("metricB", []float64{3, 4, 5, 6, 7, 8}, 1, now32),
 					makeResponse("metricC", []float64{4, 4, 5, 5, 6, 6}, 1, now32),
 				},
 			},
-			[]*metricData{makeResponse("metricB",
+			[]*MetricData{makeResponse("metricB",
 				[]float64{3, 4, 5, 6, 7, 8}, 1, now32)},
 		},
 		{
@@ -1457,14 +1457,14 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,5",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{
 					makeResponse("metricA", []float64{0, 0, 0, 0, 0, 0}, 1, now32),
 					makeResponse("metricB", []float64{3, 4, 5, 6, 7, 8}, 1, now32),
 					makeResponse("metricC", []float64{4, 4, 5, 5, 6, 6}, 1, now32),
 				},
 			},
-			[]*metricData{makeResponse("metricA",
+			[]*MetricData{makeResponse("metricA",
 				[]float64{0, 0, 0, 0, 0, 0}, 1, now32)},
 		},
 		{
@@ -1477,14 +1477,14 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,1",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{
 					makeResponse("metricA", []float64{0, 0, 0, 0, 0, 0}, 1, now32),
 					makeResponse("metricB", []float64{1, 4, 5, 6, 7, 8}, 1, now32),
 					makeResponse("metricC", []float64{2, 4, 4, 5, 5, 6}, 1, now32),
 				},
 			},
-			[]*metricData{makeResponse("metricC",
+			[]*MetricData{makeResponse("metricC",
 				[]float64{2, 4, 4, 5, 5, 6}, 1, now32)},
 		},
 		{
@@ -1497,14 +1497,14 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,-2",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{
 					makeResponse("metricA", []float64{0, 0, 0, 0, 0, 0}, 1, now32),
 					makeResponse("metricB", []float64{-1, 4, 5, 6, 7, 8}, 1, now32),
 					makeResponse("metricC", []float64{-2, 4, 4, 5, 5, 6}, 1, now32),
 				},
 			},
-			[]*metricData{makeResponse("metricC",
+			[]*MetricData{makeResponse("metricC",
 				[]float64{-2, 4, 4, 5, 5, 6}, 1, now32)},
 		},
 		{
@@ -1521,17 +1521,17 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,metric2,1,direction='abs'",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{
 					makeResponse("metricX", []float64{3, 4, 5, 6, 7, 8}, 1, now32),
 				},
-				metricRequest{"metric2", 0, 1}: []*metricData{
+				MetricRequest{"metric2", 0, 1}: []*MetricData{
 					makeResponse("metricA", []float64{0, 0, 0, 0, 0, 0}, 1, now32),
 					makeResponse("metricB", []float64{3, math.NaN(), 5, 6, 7, 8}, 1, now32),
 					makeResponse("metricC", []float64{4, 4, 5, 5, 6, 6}, 1, now32),
 				},
 			},
-			[]*metricData{makeResponse("metricB",
+			[]*MetricData{makeResponse("metricB",
 				[]float64{3, math.NaN(), 5, 6, 7, 8}, 1, now32)},
 		},
 		{
@@ -1543,10 +1543,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{-4, -2, -1, 0, 1, 2, 4}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{-4, -2, -1, 0, 1, 2, 4}, 1, now32)},
 			},
-			[]*metricData{makeResponse("invert(metric1)",
+			[]*MetricData{makeResponse("invert(metric1)",
 				[]float64{-0.25, -0.5, -1, math.NaN(), 1, 0.5, 0.25}, 1, now32)},
 		},
 		{
@@ -1559,10 +1559,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,10",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{93, 94, 95, math.NaN(), 97, 98, 99, 100, 101}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{93, 94, 95, math.NaN(), 97, 98, 99, 100, 101}, 1, now32)},
 			},
-			[]*metricData{makeResponse("offset(metric1,10)",
+			[]*MetricData{makeResponse("offset(metric1,10)",
 				[]float64{103, 104, 105, math.NaN(), 107, 108, 109, 110, 111}, 1, now32)},
 		},
 		{
@@ -1574,10 +1574,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{93, 94, 95, math.NaN(), 97, 98, 99, 100, 101}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{93, 94, 95, math.NaN(), 97, 98, 99, 100, 101}, 1, now32)},
 			},
-			[]*metricData{makeResponse("offsetToZero(metric1)",
+			[]*MetricData{makeResponse("offsetToZero(metric1)",
 				[]float64{0, 1, 2, math.NaN(), 4, 5, 6, 7, 8}, 1, now32)},
 		},
 		{
@@ -1590,14 +1590,14 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,7",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{
 					makeResponse("metricA", []float64{0, 0, 0, 0, 0, 0}, 1, now32),
 					makeResponse("metricB", []float64{3, 4, 5, 6, 7, 8}, 1, now32),
 					makeResponse("metricC", []float64{4, 4, 5, 5, 6, 6}, 1, now32),
 				},
 			},
-			[]*metricData{makeResponse("metricB",
+			[]*MetricData{makeResponse("metricB",
 				[]float64{3, 4, 5, 6, 7, 8}, 1, now32)},
 		},
 		{
@@ -1610,14 +1610,14 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,0",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{
 					makeResponse("metricA", []float64{0, 0, 0, 0, 0, math.NaN()}, 1, now32),
 					makeResponse("metricB", []float64{3, 4, 5, 6, 7, 8}, 1, now32),
 					makeResponse("metricC", []float64{0, 4, 4, 5, 5, 6}, 1, now32),
 				},
 			},
-			[]*metricData{makeResponse("metricA",
+			[]*MetricData{makeResponse("metricA",
 				[]float64{0, 0, 0, 0, 0, math.NaN()}, 1, now32)},
 		},
 		{
@@ -1629,10 +1629,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, 0, 2, 3, 4, 5, math.NaN(), 7, 8}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, 0, 2, 3, 4, 5, math.NaN(), 7, 8}, 1, now32)},
 			},
-			[]*metricData{makeResponse("integral(metric1)",
+			[]*MetricData{makeResponse("integral(metric1)",
 				[]float64{1, 1, 3, 6, 10, 15, math.NaN(), 22, 30}, 1, now32)},
 		},
 		{
@@ -1644,14 +1644,14 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{
 					makeResponse("metricA", []float64{0, 0, 0, 0, 0, 0}, 1, now32),
 					makeResponse("metricB", []float64{5, 5, 5, 5, 5, 5}, 1, now32),
 					makeResponse("metricC", []float64{4, 4, 5, 5, 4, 4}, 1, now32),
 				},
 			},
-			[]*metricData{
+			[]*MetricData{
 				makeResponse("metricB", []float64{5, 5, 5, 5, 5, 5}, 1, now32),
 				makeResponse("metricC", []float64{4, 4, 5, 5, 4, 4}, 1, now32),
 				makeResponse("metricA", []float64{0, 0, 0, 0, 0, 0}, 1, now32),
@@ -1666,14 +1666,14 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{
 					makeResponse("metricA", []float64{0, 0, 0, 0, 0, 0}, 1, now32),
 					makeResponse("metricB", []float64{5, 5, 5, 5, 5, 5}, 1, now32),
 					makeResponse("metricC", []float64{2, 2, 10, 5, 2, 2}, 1, now32),
 				},
 			},
-			[]*metricData{
+			[]*MetricData{
 				makeResponse("metricC", []float64{2, 2, 10, 5, 2, 2}, 1, now32),
 				makeResponse("metricB", []float64{5, 5, 5, 5, 5, 5}, 1, now32),
 				makeResponse("metricA", []float64{0, 0, 0, 0, 0, 0}, 1, now32),
@@ -1688,14 +1688,14 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{
 					makeResponse("metricA", []float64{0, 0, 0, 0, 0, 0}, 1, now32),
 					makeResponse("metricB", []float64{3, 4, 5, 6, 7, 8}, 1, now32),
 					makeResponse("metricC", []float64{4, 4, 5, 5, 6, 6}, 1, now32),
 				},
 			},
-			[]*metricData{
+			[]*MetricData{
 				makeResponse("metricA", []float64{0, 0, 0, 0, 0, 0}, 1, now32),
 				makeResponse("metricB", []float64{3, 4, 5, 6, 7, 8}, 1, now32),
 				makeResponse("metricC", []float64{4, 4, 5, 5, 6, 6}, 1, now32),
@@ -1710,15 +1710,15 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{
 					makeResponse("metricX", []float64{0, 0, 0, 0, 0, 0}, 1, now32),
 					makeResponse("metricA", []float64{0, 1, 0, 0, 0, 0}, 1, now32),
 					makeResponse("metricB", []float64{0, 0, 2, 0, 0, 0}, 1, now32),
 					makeResponse("metricC", []float64{0, 0, 0, 3, 0, 0}, 1, now32),
 				},
 			},
-			[]*metricData{
+			[]*MetricData{
 				makeResponse("metricA", []float64{0, 1, 0, 0, 0, 0}, 1, now32),
 				makeResponse("metricB", []float64{0, 0, 2, 0, 0, 0}, 1, now32),
 				makeResponse("metricC", []float64{0, 0, 0, 3, 0, 0}, 1, now32),
@@ -1737,8 +1737,8 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1,natural=true",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{
 					makeResponse("metric1", []float64{0, 0, 0, 0, 0, 0}, 1, now32),
 					makeResponse("metric12", []float64{0, 1, 0, 0, 0, 0}, 1, now32),
 					makeResponse("metric1234567890", []float64{0, 0, 0, 5, 0, 0}, 1, now32),
@@ -1747,7 +1747,7 @@ func TestEvalExpression(t *testing.T) {
 					makeResponse("metric", []float64{0, 0, 0, 0, 0, 0}, 1, now32),
 				},
 			},
-			[]*metricData{
+			[]*MetricData{
 				makeResponse("metric", []float64{0, 0, 0, 0, 0, 0}, 1, now32),
 				makeResponse("metric1", []float64{0, 0, 0, 0, 0, 0}, 1, now32),
 				makeResponse("metric2", []float64{0, 0, 2, 0, 0, 0}, 1, now32),
@@ -1765,10 +1765,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "42.42",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"42.42", 0, 1}: []*metricData{makeResponse("constantLine", []float64{12.3, 12.3}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"42.42", 0, 1}: []*MetricData{makeResponse("constantLine", []float64{12.3, 12.3}, 1, now32)},
 			},
-			[]*metricData{makeResponse("42.42",
+			[]*MetricData{makeResponse("42.42",
 				[]float64{42.42, 42.42}, 1, now32)},
 		},
 		{
@@ -1780,8 +1780,8 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "42.42",
 			},
-			map[metricRequest][]*metricData{},
-			[]*metricData{makeResponse("42.42",
+			map[MetricRequest][]*MetricData{},
+			[]*MetricData{makeResponse("42.42",
 				[]float64{42.42, 42.42}, 1, now32)},
 		},
 		{
@@ -1794,8 +1794,8 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "42.42,'fourty-two'",
 			},
-			map[metricRequest][]*metricData{},
-			[]*metricData{makeResponse("fourty-two",
+			map[MetricRequest][]*MetricData{},
+			[]*MetricData{makeResponse("fourty-two",
 				[]float64{42.42, 42.42}, 1, now32)},
 		},
 		{
@@ -1809,8 +1809,8 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "42.42,'fourty-two','blue'",
 			},
-			map[metricRequest][]*metricData{},
-			[]*metricData{makeResponse("fourty-two",
+			map[MetricRequest][]*MetricData{},
+			[]*MetricData{makeResponse("fourty-two",
 				[]float64{42.42, 42.42}, 1, now32)},
 		},
 		{
@@ -1825,8 +1825,8 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "42.42,label='fourty-two'",
 			},
-			map[metricRequest][]*metricData{},
-			[]*metricData{makeResponse("fourty-two",
+			map[MetricRequest][]*MetricData{},
+			[]*MetricData{makeResponse("fourty-two",
 				[]float64{42.42, 42.42}, 1, now32)},
 		},
 		{
@@ -1842,8 +1842,8 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "42.42,color='blue'",
 			},
-			map[metricRequest][]*metricData{},
-			[]*metricData{makeResponse("42.42",
+			map[MetricRequest][]*MetricData{},
+			[]*MetricData{makeResponse("42.42",
 				[]float64{42.42, 42.42}, 1, now32)},
 		},
 		{
@@ -1860,8 +1860,8 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "42.42,label='fourty-two-blue',color='blue'",
 			},
-			map[metricRequest][]*metricData{},
-			[]*metricData{makeResponse("fourty-two-blue",
+			map[MetricRequest][]*MetricData{},
+			[]*MetricData{makeResponse("fourty-two-blue",
 				[]float64{42.42, 42.42}, 1, now32)},
 		},
 		{
@@ -1873,10 +1873,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, 2, 0, 7, 8, 20, 30, math.NaN()}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, 2, 0, 7, 8, 20, 30, math.NaN()}, 1, now32)},
 			},
-			[]*metricData{makeResponse("squareRoot(metric1)",
+			[]*MetricData{makeResponse("squareRoot(metric1)",
 				[]float64{1, 1.4142135623730951, 0, 2.6457513110645907, 2.8284271247461903, 4.47213595499958, 5.477225575051661, math.NaN()}, 1, now32)},
 		},
 		{
@@ -1888,14 +1888,14 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric*",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric*", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric*", 0, 1}: []*MetricData{
 					makeResponse("metric1", []float64{1, 2, -1, 7, 8, 20, 30, math.NaN()}, 1, now32),
 					makeResponse("metric2", []float64{math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN()}, 1, now32),
 					makeResponse("metric3", []float64{0, 0, 0, 0, 0, 0, 0, 0}, 1, now32),
 				},
 			},
-			[]*metricData{
+			[]*MetricData{
 				makeResponse("metric1", []float64{1, 2, -1, 7, 8, 20, 30, math.NaN()}, 1, now32),
 				makeResponse("metric3", []float64{0, 0, 0, 0, 0, 0, 0, 0}, 1, now32),
 			},
@@ -1909,14 +1909,14 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric*",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric*", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric*", 0, 1}: []*MetricData{
 					makeResponse("metric1", []float64{1, 2, -1, 7, 8, 20, 30, math.NaN()}, 1, now32),
 					makeResponse("metric2", []float64{math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN()}, 1, now32),
 					makeResponse("metric3", []float64{0, 0, 0, 0, 0, 0, 0, 0}, 1, now32),
 				},
 			},
-			[]*metricData{
+			[]*MetricData{
 				makeResponse("metric1", []float64{1, 2, -1, 7, 8, 20, 30, math.NaN()}, 1, now32),
 			},
 		},
@@ -1930,10 +1930,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, 2, -1, 7, 8, 20, 30, math.NaN()}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, 2, -1, 7, 8, 20, 30, math.NaN()}, 1, now32)},
 			},
-			[]*metricData{makeResponse("removeBelowValue(metric1, 0)",
+			[]*MetricData{makeResponse("removeBelowValue(metric1, 0)",
 				[]float64{1, 2, math.NaN(), 7, 8, 20, 30, math.NaN()}, 1, now32)},
 		},
 		{
@@ -1946,10 +1946,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, 2, -1, 7, 8, 20, 30, math.NaN()}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, 2, -1, 7, 8, 20, 30, math.NaN()}, 1, now32)},
 			},
-			[]*metricData{makeResponse("removeAboveValue(metric1, 10)",
+			[]*MetricData{makeResponse("removeAboveValue(metric1, 10)",
 				[]float64{1, 2, -1, 7, 8, math.NaN(), math.NaN(), math.NaN()}, 1, now32)},
 		},
 		{
@@ -1962,10 +1962,10 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, 2, -1, 7, 8, 20, 30, math.NaN()}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, 2, -1, 7, 8, 20, 30, math.NaN()}, 1, now32)},
 			},
-			[]*metricData{makeResponse("removeBelowPercentile(metric1, 50)",
+			[]*MetricData{makeResponse("removeBelowPercentile(metric1, 50)",
 				[]float64{math.NaN(), math.NaN(), math.NaN(), 7, 8, 20, 30, math.NaN()}, 1, now32)},
 		},
 		{
@@ -1978,20 +1978,20 @@ func TestEvalExpression(t *testing.T) {
 				},
 				argString: "metric1",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, 2, -1, 7, 8, 20, 30, math.NaN()}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, 2, -1, 7, 8, 20, 30, math.NaN()}, 1, now32)},
 			},
-			[]*metricData{makeResponse("removeAbovePercentile(metric1, 50)",
+			[]*MetricData{makeResponse("removeAbovePercentile(metric1, 50)",
 				[]float64{1, 2, -1, 7, math.NaN(), math.NaN(), math.NaN(), math.NaN()}, 1, now32)},
 		},
 	}
 
 	for _, tt := range tests {
-		oldValues := map[metricRequest][]*metricData{}
+		oldValues := map[MetricRequest][]*MetricData{}
 		for key, metrics := range tt.m {
-			entry := []*metricData{}
+			entry := []*MetricData{}
 			for _, value := range metrics {
-				newValue := metricData{
+				newValue := MetricData{
 					FetchResponse: pb.FetchResponse{
 						Name:      value.Name,
 						StartTime: value.StartTime,
@@ -2011,7 +2011,7 @@ func TestEvalExpression(t *testing.T) {
 		}
 
 		testName := tt.e.target + "(" + tt.e.argString + ")"
-		g, err := evalExpr(tt.e, 0, 1, tt.m)
+		g, err := EvalExpr(tt.e, 0, 1, tt.m)
 		if err != nil {
 			t.Errorf("failed to eval %s: %s", testName, err)
 			continue
@@ -2076,7 +2076,7 @@ func TestEvalSummarize(t *testing.T) {
 
 	tests := []struct {
 		e     *expr
-		m     map[metricRequest][]*metricData
+		m     map[MetricRequest][]*MetricData
 		w     []float64
 		name  string
 		step  int32
@@ -2093,8 +2093,8 @@ func TestEvalSummarize(t *testing.T) {
 				},
 				argString: "metric1,'5s'",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{
 					1, 1, 1, 1, 1,
 					2, 2, 2, 2, 2,
 					3, 3, 3, 3, 3,
@@ -2123,8 +2123,8 @@ func TestEvalSummarize(t *testing.T) {
 				},
 				argString: "metric1,'5s',func='avg'",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 1, 2, 3, math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN()}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 1, 2, 3, math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN()}, 1, now32)},
 			},
 			[]float64{1, 2, 3, 4, 5, 2, math.NaN()},
 			"summarize(metric1,'5s','avg')",
@@ -2145,8 +2145,8 @@ func TestEvalSummarize(t *testing.T) {
 				},
 				argString: "metric1,'5s',func='max'",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, 0, 0, 0.5, 1, 2, 1, 1, 1.5, 2, 3, 2, 2, 1.5, 3, 4, 3, 2, 3, 4.5, 5, 5, 5, 5, 5}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, 0, 0, 0.5, 1, 2, 1, 1, 1.5, 2, 3, 2, 2, 1.5, 3, 4, 3, 2, 3, 4.5, 5, 5, 5, 5, 5}, 1, now32)},
 			},
 			[]float64{1, 2, 3, 4.5, 5},
 			"summarize(metric1,'5s','max')",
@@ -2167,8 +2167,8 @@ func TestEvalSummarize(t *testing.T) {
 				},
 				argString: "metric1,'5s',func='min'",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, 0, 0, 0.5, 1, 2, 1, 1, 1.5, 2, 3, 2, 2, 1.5, 3, 4, 3, 2, 3, 4.5, 5, 5, 5, 5, 5}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, 0, 0, 0.5, 1, 2, 1, 1, 1.5, 2, 3, 2, 2, 1.5, 3, 4, 3, 2, 3, 4.5, 5, 5, 5, 5, 5}, 1, now32)},
 			},
 			[]float64{0, 1, 1.5, 2, 5},
 			"summarize(metric1,'5s','min')",
@@ -2189,8 +2189,8 @@ func TestEvalSummarize(t *testing.T) {
 				},
 				argString: "metric1,'5s',func='last'",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, 0, 0, 0.5, 1, 2, 1, 1, 1.5, 2, 3, 2, 2, 1.5, 3, 4, 3, 2, 3, 4.5, 5, 5, 5, 5, 5}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, 0, 0, 0.5, 1, 2, 1, 1, 1.5, 2, 3, 2, 2, 1.5, 3, 4, 3, 2, 3, 4.5, 5, 5, 5, 5, 5}, 1, now32)},
 			},
 			[]float64{1, 2, 3, 4.5, 5},
 			"summarize(metric1,'5s','last')",
@@ -2209,8 +2209,8 @@ func TestEvalSummarize(t *testing.T) {
 				},
 				argString: "metric1,'5s','p50'",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, 0, 0, 0.5, 1, 2, 1, 1, 1.5, 2, 3, 2, 2, 1.5, 3, 4, 3, 2, 3, 4.5, 5, 5, 5, 5, 5}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, 0, 0, 0.5, 1, 2, 1, 1, 1.5, 2, 3, 2, 2, 1.5, 3, 4, 3, 2, 3, 4.5, 5, 5, 5, 5, 5}, 1, now32)},
 			},
 			[]float64{0.5, 1.5, 2, 3, 5},
 			"summarize(metric1,'5s','p50')",
@@ -2229,8 +2229,8 @@ func TestEvalSummarize(t *testing.T) {
 				},
 				argString: "metric1,'5s','p25'",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, 0, 0, 0.5, 1, 2, 1, 1, 1.5, 2, 3, 2, 2, 1.5, 3, 4, 3, 2, 3, 4.5, 5, 5, 5, 5, 5}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, 0, 0, 0.5, 1, 2, 1, 1, 1.5, 2, 3, 2, 2, 1.5, 3, 4, 3, 2, 3, 4.5, 5, 5, 5, 5, 5}, 1, now32)},
 			},
 			[]float64{0, 1, 2, 3, 5},
 			"summarize(metric1,'5s','p25')",
@@ -2249,8 +2249,8 @@ func TestEvalSummarize(t *testing.T) {
 				},
 				argString: "metric1,'5s','p99.9'",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, 0, 0, 0.5, 1, 2, 1, 1, 1.5, 2, 3, 2, 2, 1.5, 3, 4, 3, 2, 3, 4.5, 5, 5, 5, 5, 5}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, 0, 0, 0.5, 1, 2, 1, 1, 1.5, 2, 3, 2, 2, 1.5, 3, 4, 3, 2, 3, 4.5, 5, 5, 5, 5, 5}, 1, now32)},
 			},
 			[]float64{1, 2, 3, 4.498, 5},
 			"summarize(metric1,'5s','p99.9')",
@@ -2269,8 +2269,8 @@ func TestEvalSummarize(t *testing.T) {
 				},
 				argString: "metric1,'5s','p100.1'",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, 0, 0, 0.5, 1, 2, 1, 1, 1.5, 2, 3, 2, 2, 1.5, 3, 4, 3, 2, 3, 4.5, 5, 5, 5, 5, 5}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, 0, 0, 0.5, 1, 2, 1, 1, 1.5, 2, 3, 2, 2, 1.5, 3, 4, 3, 2, 3, 4.5, 5, 5, 5, 5, 5}, 1, now32)},
 			},
 			[]float64{math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN()},
 			"summarize(metric1,'5s','p100.1')",
@@ -2289,8 +2289,8 @@ func TestEvalSummarize(t *testing.T) {
 				},
 				argString: "metric1,'1s','p50'",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{1, 0, 0, 0.5, 1, 2, 1, 1, 1.5, 2, 3, 2, 2, 1.5, 3, 4, 3, 2, 3, 4.5, 5, 5, 5, 5, 5}, 1, now32)},
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{1, 0, 0, 0.5, 1, 2, 1, 1, 1.5, 2, 3, 2, 2, 1.5, 3, 4, 3, 2, 3, 4.5, 5, 5, 5, 5, 5}, 1, now32)},
 			},
 			[]float64{1, 0, 0, 0.5, 1, 2, 1, 1, 1.5, 2, 3, 2, 2, 1.5, 3, 4, 3, 2, 3, 4.5, 5, 5, 5, 5, 5},
 			"summarize(metric1,'1s','p50')",
@@ -2308,8 +2308,8 @@ func TestEvalSummarize(t *testing.T) {
 				},
 				argString: "metric1,'10min'",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{
 					1, 1, 1, 1, 1, 2, 2, 2, 2, 2,
 					3, 3, 3, 3, 3, 4, 4, 4, 4, 4,
 					5, 5, 5, 5, 5}, 60, tenThirtyTwo)},
@@ -2334,8 +2334,8 @@ func TestEvalSummarize(t *testing.T) {
 				},
 				argString: "metric1,'10min',alignToFrom=true,func='sum'",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{
 					1, 1, 1, 1, 1, 2, 2, 2, 2, 2,
 					3, 3, 3, 3, 3, 4, 4, 4, 4, 4,
 					5, 5, 5, 5, 5}, 60, tenThirtyTwo)},
@@ -2359,8 +2359,8 @@ func TestEvalSummarize(t *testing.T) {
 				},
 				argString: "metric1,'10min',alignToFrom=true",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{
 					1, 1, 1, 1, 1, 2, 2, 2, 2, 2,
 					3, 3, 3, 3, 3, 4, 4, 4, 4, 4,
 					5, 5, 5, 5, 5}, 60, tenThirtyTwo)},
@@ -2381,8 +2381,8 @@ func TestEvalSummarize(t *testing.T) {
 				},
 				argString: "metric1,'30s'",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{
 					1, 1, 1, 1, 1, 2,
 					2, 2, 2, 2, 3, 3,
 					3, 3, 3, 4, 4, 4,
@@ -2406,8 +2406,8 @@ func TestEvalSummarize(t *testing.T) {
 				},
 				argString: "metric1,'1h'",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{
 					1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3,
 					3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5,
 					5}, 5, tenFiftyNine)},
@@ -2429,8 +2429,8 @@ func TestEvalSummarize(t *testing.T) {
 				},
 				argString: "metric1,'1h',true",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{
 					1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3,
 					3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5,
 					5}, 5, tenFiftyNine)},
@@ -2454,8 +2454,8 @@ func TestEvalSummarize(t *testing.T) {
 				},
 				argString: "metric1,'1h',alignToInterval=true",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{makeResponse("metric1", []float64{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{makeResponse("metric1", []float64{
 					1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3,
 					3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5,
 					5}, 5, tenFiftyNine)},
@@ -2469,7 +2469,7 @@ func TestEvalSummarize(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		g, err := evalExpr(tt.e, 0, 1, tt.m)
+		g, err := EvalExpr(tt.e, 0, 1, tt.m)
 		if err != nil {
 			t.Errorf("failed to eval %v: %s", tt.name, err)
 			continue
@@ -2499,9 +2499,9 @@ func TestEvalMultipleReturns(t *testing.T) {
 
 	tests := []struct {
 		e       *expr
-		m       map[metricRequest][]*metricData
+		m       map[MetricRequest][]*MetricData
 		name    string
-		results map[string][]*metricData
+		results map[string][]*MetricData
 	}{
 		{
 			&expr{
@@ -2513,8 +2513,8 @@ func TestEvalMultipleReturns(t *testing.T) {
 					&expr{valStr: "sum", etype: etString},
 				},
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1.foo.*.*", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1.foo.*.*", 0, 1}: []*MetricData{
 					makeResponse("metric1.foo.bar1.baz", []float64{1, 2, 3, 4, 5}, 1, now32),
 					makeResponse("metric1.foo.bar1.qux", []float64{6, 7, 8, 9, 10}, 1, now32),
 					makeResponse("metric1.foo.bar2.baz", []float64{11, 12, 13, 14, 15}, 1, now32),
@@ -2522,9 +2522,9 @@ func TestEvalMultipleReturns(t *testing.T) {
 				},
 			},
 			"groupByNode",
-			map[string][]*metricData{
-				"baz": []*metricData{makeResponse("baz", []float64{12, 14, 16, 18, 20}, 1, now32)},
-				"qux": []*metricData{makeResponse("qux", []float64{13, 15, 17, 19, 21}, 1, now32)},
+			map[string][]*MetricData{
+				"baz": []*MetricData{makeResponse("baz", []float64{12, 14, 16, 18, 20}, 1, now32)},
+				"qux": []*MetricData{makeResponse("qux", []float64{13, 15, 17, 19, 21}, 1, now32)},
 			},
 		},
 		{
@@ -2537,22 +2537,22 @@ func TestEvalMultipleReturns(t *testing.T) {
 					&expr{valStr: "sumSeries(%.baz)", etype: etString},
 				},
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1.foo.*.*", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1.foo.*.*", 0, 1}: []*MetricData{
 					makeResponse("metric1.foo.bar1.baz", []float64{1, 2, 3, 4, 5}, 1, now32),
 					makeResponse("metric1.foo.bar2.baz", []float64{11, 12, 13, 14, 15}, 1, now32),
 				},
-				metricRequest{"metric1.foo.bar1.baz", 0, 1}: []*metricData{
+				MetricRequest{"metric1.foo.bar1.baz", 0, 1}: []*MetricData{
 					makeResponse("metric1.foo.bar1.baz", []float64{1, 2, 3, 4, 5}, 1, now32),
 				},
-				metricRequest{"metric1.foo.bar2.baz", 0, 1}: []*metricData{
+				MetricRequest{"metric1.foo.bar2.baz", 0, 1}: []*MetricData{
 					makeResponse("metric1.foo.bar2.baz", []float64{11, 12, 13, 14, 15}, 1, now32),
 				},
 			},
 			"applyByNode",
-			map[string][]*metricData{
-				"metric1.foo.bar1": []*metricData{makeResponse("metric1.foo.bar1", []float64{1, 2, 3, 4, 5}, 1, now32)},
-				"metric1.foo.bar2": []*metricData{makeResponse("metric1.foo.bar2", []float64{11, 12, 13, 14, 15}, 1, now32)},
+			map[string][]*MetricData{
+				"metric1.foo.bar1": []*MetricData{makeResponse("metric1.foo.bar1", []float64{1, 2, 3, 4, 5}, 1, now32)},
+				"metric1.foo.bar2": []*MetricData{makeResponse("metric1.foo.bar2", []float64{11, 12, 13, 14, 15}, 1, now32)},
 			},
 		},
 		{
@@ -2565,8 +2565,8 @@ func TestEvalMultipleReturns(t *testing.T) {
 					&expr{val: 2, etype: etConst},
 				},
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1.foo.*.*", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1.foo.*.*", 0, 1}: []*MetricData{
 					makeResponse("metric1.foo.bar1.baz", []float64{1, 2, 3, 4, 5}, 1, now32),
 					makeResponse("metric1.foo.bar1.qux", []float64{6, 7, 8, 9, 10}, 1, now32),
 					makeResponse("metric1.foo.bar2.baz", []float64{11, 12, 13, 14, 15}, 1, now32),
@@ -2574,9 +2574,9 @@ func TestEvalMultipleReturns(t *testing.T) {
 				},
 			},
 			"sumSeriesWithWildcards",
-			map[string][]*metricData{
-				"sumSeriesWithWildcards(metric1.baz)": []*metricData{makeResponse("sumSeriesWithWildcards(metric1.baz)", []float64{12, 14, 16, 18, 20}, 1, now32)},
-				"sumSeriesWithWildcards(metric1.qux)": []*metricData{makeResponse("sumSeriesWithWildcards(metric1.qux)", []float64{13, 15, 17, 19, 21}, 1, now32)},
+			map[string][]*MetricData{
+				"sumSeriesWithWildcards(metric1.baz)": []*MetricData{makeResponse("sumSeriesWithWildcards(metric1.baz)", []float64{12, 14, 16, 18, 20}, 1, now32)},
+				"sumSeriesWithWildcards(metric1.qux)": []*MetricData{makeResponse("sumSeriesWithWildcards(metric1.qux)", []float64{13, 15, 17, 19, 21}, 1, now32)},
 			},
 		},
 		{
@@ -2589,8 +2589,8 @@ func TestEvalMultipleReturns(t *testing.T) {
 					&expr{val: 2, etype: etConst},
 				},
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1.foo.*.*", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1.foo.*.*", 0, 1}: []*MetricData{
 					makeResponse("metric1.foo.bar1.baz", []float64{1, 2, 3, 4, 5}, 1, now32),
 					makeResponse("metric1.foo.bar1.qux", []float64{6, 7, 8, 9, 10}, 1, now32),
 					makeResponse("metric1.foo.bar2.baz", []float64{11, 12, 13, 14, 15}, 1, now32),
@@ -2598,9 +2598,9 @@ func TestEvalMultipleReturns(t *testing.T) {
 				},
 			},
 			"averageSeriesWithWildcards",
-			map[string][]*metricData{
-				"averageSeriesWithWildcards(metric1.baz)": []*metricData{makeResponse("averageSeriesWithWildcards(metric1.baz)", []float64{6, 7, 8, 9, 10}, 1, now32)},
-				"averageSeriesWithWildcards(metric1.qux)": []*metricData{makeResponse("averageSeriesWithWildcards(metric1.qux)", []float64{6.5, 7.5, 8.5, 9.5, 10.5}, 1, now32)},
+			map[string][]*MetricData{
+				"averageSeriesWithWildcards(metric1.baz)": []*MetricData{makeResponse("averageSeriesWithWildcards(metric1.baz)", []float64{6, 7, 8, 9, 10}, 1, now32)},
+				"averageSeriesWithWildcards(metric1.qux)": []*MetricData{makeResponse("averageSeriesWithWildcards(metric1.qux)", []float64{6.5, 7.5, 8.5, 9.5, 10.5}, 1, now32)},
 			},
 		},
 		{
@@ -2613,17 +2613,17 @@ func TestEvalMultipleReturns(t *testing.T) {
 				},
 				argString: "metric1,2",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{
 					makeResponse("metricA", []float64{1, 1, 3, 3, 4, 12}, 1, now32),
 					makeResponse("metricB", []float64{1, 1, 3, 3, 4, 1}, 1, now32),
 					makeResponse("metricC", []float64{1, 1, 3, 3, 4, 15}, 1, now32),
 				},
 			},
 			"highestCurrent",
-			map[string][]*metricData{
-				"metricA": []*metricData{makeResponse("metricA", []float64{1, 1, 3, 3, 4, 12}, 1, now32)},
-				"metricC": []*metricData{makeResponse("metricC", []float64{1, 1, 3, 3, 4, 15}, 1, now32)},
+			map[string][]*MetricData{
+				"metricA": []*MetricData{makeResponse("metricA", []float64{1, 1, 3, 3, 4, 12}, 1, now32)},
+				"metricC": []*MetricData{makeResponse("metricC", []float64{1, 1, 3, 3, 4, 15}, 1, now32)},
 			},
 		},
 		{
@@ -2635,8 +2635,8 @@ func TestEvalMultipleReturns(t *testing.T) {
 					&expr{val: 3, etype: etConst},
 				},
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{
 					makeResponse("metricB", []float64{1, 1, 3, 3, 4, 1}, 1, now32),
 					makeResponse("metricC", []float64{1, 1, 3, 3, 4, 15}, 1, now32),
 					makeResponse("metricD", []float64{1, 1, 3, 3, 4, 3}, 1, now32),
@@ -2644,10 +2644,10 @@ func TestEvalMultipleReturns(t *testing.T) {
 				},
 			},
 			"lowestCurrent",
-			map[string][]*metricData{
-				"metricA": []*metricData{makeResponse("metricA", []float64{1, 1, 3, 3, 4, 12}, 1, now32)},
-				"metricB": []*metricData{makeResponse("metricB", []float64{1, 1, 3, 3, 4, 1}, 1, now32)},
-				"metricD": []*metricData{makeResponse("metricD", []float64{1, 1, 3, 3, 4, 3}, 1, now32)},
+			map[string][]*MetricData{
+				"metricA": []*MetricData{makeResponse("metricA", []float64{1, 1, 3, 3, 4, 12}, 1, now32)},
+				"metricB": []*MetricData{makeResponse("metricB", []float64{1, 1, 3, 3, 4, 1}, 1, now32)},
+				"metricD": []*MetricData{makeResponse("metricD", []float64{1, 1, 3, 3, 4, 3}, 1, now32)},
 			},
 		},
 		{
@@ -2660,8 +2660,8 @@ func TestEvalMultipleReturns(t *testing.T) {
 				},
 				argString: "metric1, 2",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{
 					makeResponse("metricA", []float64{0, 1, 0, 0, 0, 0}, 1, now32),
 					makeResponse("metricB", []float64{0, 0, 1, 0, 0, 0}, 1, now32),
 					makeResponse("metricC", []float64{0, 0, 0, 1, 0, 0}, 1, now32),
@@ -2670,9 +2670,9 @@ func TestEvalMultipleReturns(t *testing.T) {
 				},
 			},
 			"limit",
-			map[string][]*metricData{
-				"metricA": []*metricData{makeResponse("metricA", []float64{0, 1, 0, 0, 0, 0}, 1, now32)},
-				"metricB": []*metricData{makeResponse("metricB", []float64{0, 0, 1, 0, 0, 0}, 1, now32)},
+			map[string][]*MetricData{
+				"metricA": []*MetricData{makeResponse("metricA", []float64{0, 1, 0, 0, 0, 0}, 1, now32)},
+				"metricB": []*MetricData{makeResponse("metricB", []float64{0, 0, 1, 0, 0, 0}, 1, now32)},
 			},
 		},
 		{
@@ -2685,8 +2685,8 @@ func TestEvalMultipleReturns(t *testing.T) {
 				},
 				argString: "metric1, 20",
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric1", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric1", 0, 1}: []*MetricData{
 					makeResponse("metricA", []float64{0, 1, 0, 0, 0, 0}, 1, now32),
 					makeResponse("metricB", []float64{0, 0, 1, 0, 0, 0}, 1, now32),
 					makeResponse("metricC", []float64{0, 0, 0, 1, 0, 0}, 1, now32),
@@ -2695,12 +2695,12 @@ func TestEvalMultipleReturns(t *testing.T) {
 				},
 			},
 			"limit",
-			map[string][]*metricData{
-				"metricA": []*metricData{makeResponse("metricA", []float64{0, 1, 0, 0, 0, 0}, 1, now32)},
-				"metricB": []*metricData{makeResponse("metricB", []float64{0, 0, 1, 0, 0, 0}, 1, now32)},
-				"metricC": []*metricData{makeResponse("metricC", []float64{0, 0, 0, 1, 0, 0}, 1, now32)},
-				"metricD": []*metricData{makeResponse("metricD", []float64{0, 0, 0, 0, 1, 0}, 1, now32)},
-				"metricE": []*metricData{makeResponse("metricE", []float64{0, 0, 0, 0, 0, 1}, 1, now32)},
+			map[string][]*MetricData{
+				"metricA": []*MetricData{makeResponse("metricA", []float64{0, 1, 0, 0, 0, 0}, 1, now32)},
+				"metricB": []*MetricData{makeResponse("metricB", []float64{0, 0, 1, 0, 0, 0}, 1, now32)},
+				"metricC": []*MetricData{makeResponse("metricC", []float64{0, 0, 0, 1, 0, 0}, 1, now32)},
+				"metricD": []*MetricData{makeResponse("metricD", []float64{0, 0, 0, 0, 1, 0}, 1, now32)},
+				"metricE": []*MetricData{makeResponse("metricE", []float64{0, 0, 0, 0, 0, 1}, 1, now32)},
 			},
 		},
 		{
@@ -2712,8 +2712,8 @@ func TestEvalMultipleReturns(t *testing.T) {
 					&expr{target: "metric*"},
 				},
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric*", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric*", 0, 1}: []*MetricData{
 					makeResponse("metricA", []float64{0, 0, 0, 0, 0, 0}, 1, now32),
 					makeResponse("metricB", []float64{3, 4, 5, 6, 7, 8}, 1, now32),
 					makeResponse("metricC", []float64{4, 4, 5, 5, 6, 6}, 1, now32),
@@ -2722,9 +2722,9 @@ func TestEvalMultipleReturns(t *testing.T) {
 				},
 			},
 			"mostDeviant",
-			map[string][]*metricData{
-				"metricB": []*metricData{makeResponse("metricB", []float64{3, 4, 5, 6, 7, 8}, 1, now32)},
-				"metricE": []*metricData{makeResponse("metricE", []float64{4, 7, 7, 7, 7, 1}, 1, now32)},
+			map[string][]*MetricData{
+				"metricB": []*MetricData{makeResponse("metricB", []float64{3, 4, 5, 6, 7, 8}, 1, now32)},
+				"metricE": []*MetricData{makeResponse("metricE", []float64{4, 7, 7, 7, 7, 1}, 1, now32)},
 			},
 		},
 		{
@@ -2736,8 +2736,8 @@ func TestEvalMultipleReturns(t *testing.T) {
 					&expr{val: 2, etype: etConst},
 				},
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric*", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric*", 0, 1}: []*MetricData{
 					makeResponse("metricA", []float64{0, 0, 0, 0, 0, 0}, 1, now32),
 					makeResponse("metricB", []float64{3, 4, 5, 6, 7, 8}, 1, now32),
 					makeResponse("metricC", []float64{4, 4, 5, 5, 6, 6}, 1, now32),
@@ -2746,9 +2746,9 @@ func TestEvalMultipleReturns(t *testing.T) {
 				},
 			},
 			"mostDeviant",
-			map[string][]*metricData{
-				"metricB": []*metricData{makeResponse("metricB", []float64{3, 4, 5, 6, 7, 8}, 1, now32)},
-				"metricE": []*metricData{makeResponse("metricE", []float64{4, 7, 7, 7, 7, 1}, 1, now32)},
+			map[string][]*MetricData{
+				"metricB": []*MetricData{makeResponse("metricB", []float64{3, 4, 5, 6, 7, 8}, 1, now32)},
+				"metricE": []*MetricData{makeResponse("metricE", []float64{4, 7, 7, 7, 7, 1}, 1, now32)},
 			},
 		},
 		{
@@ -2761,22 +2761,22 @@ func TestEvalMultipleReturns(t *testing.T) {
 					&expr{val: 2, etype: etConst},
 				},
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric*", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric*", 0, 1}: []*MetricData{
 					makeResponse("metricA", []float64{0, 0, 0, 0, 0, 0}, 1, now32),
 					makeResponse("metricB", []float64{3, 4, 5, 6, 7, 8}, 1, now32),
 					makeResponse("metricC", []float64{4, 4, 5, 5, 6, 6}, 1, now32),
 					makeResponse("metricD", []float64{4, 4, 5, 5, 6, 6}, 1, now32),
 					makeResponse("metricE", []float64{4, 7, 7, 7, 7, 1}, 1, now32),
 				},
-				metricRequest{"metricC", 0, 1}: []*metricData{
+				MetricRequest{"metricC", 0, 1}: []*MetricData{
 					makeResponse("metricC", []float64{4, 4, 5, 5, 6, 6}, 1, now32),
 				},
 			},
 			"pearsonClosest",
-			map[string][]*metricData{
-				"metricC": []*metricData{makeResponse("metricC", []float64{4, 4, 5, 5, 6, 6}, 1, now32)},
-				"metricD": []*metricData{makeResponse("metricD", []float64{4, 4, 5, 5, 6, 6}, 1, now32)},
+			map[string][]*MetricData{
+				"metricC": []*MetricData{makeResponse("metricC", []float64{4, 4, 5, 5, 6, 6}, 1, now32)},
+				"metricD": []*MetricData{makeResponse("metricD", []float64{4, 4, 5, 5, 6, 6}, 1, now32)},
 			},
 		},
 		{
@@ -2789,23 +2789,23 @@ func TestEvalMultipleReturns(t *testing.T) {
 					&expr{val: 3, etype: etConst},
 				},
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric*", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric*", 0, 1}: []*MetricData{
 					makeResponse("metricA", []float64{0, 0, 0, 0, 0, 0}, 1, now32),
 					makeResponse("metricB", []float64{3, 4, 5, 6, 7, 8}, 1, now32),
 					makeResponse("metricC", []float64{4, 4, 5, 5, 6, 6}, 1, now32),
 					makeResponse("metricD", []float64{4, 4, 5, 5, 6, 6}, 1, now32),
 					makeResponse("metricE", []float64{4, 7, 7, 7, 7, 1}, 1, now32),
 				},
-				metricRequest{"metricC", 0, 1}: []*metricData{
+				MetricRequest{"metricC", 0, 1}: []*MetricData{
 					makeResponse("metricC", []float64{4, 4, 5, 5, 6, 6}, 1, now32),
 				},
 			},
 			"pearsonClosest",
-			map[string][]*metricData{
-				"metricB": []*metricData{makeResponse("metricB", []float64{3, 4, 5, 6, 7, 8}, 1, now32)},
-				"metricC": []*metricData{makeResponse("metricC", []float64{4, 4, 5, 5, 6, 6}, 1, now32)},
-				"metricD": []*metricData{makeResponse("metricD", []float64{4, 4, 5, 5, 6, 6}, 1, now32)},
+			map[string][]*MetricData{
+				"metricB": []*MetricData{makeResponse("metricB", []float64{3, 4, 5, 6, 7, 8}, 1, now32)},
+				"metricC": []*MetricData{makeResponse("metricC", []float64{4, 4, 5, 5, 6, 6}, 1, now32)},
+				"metricD": []*MetricData{makeResponse("metricD", []float64{4, 4, 5, 5, 6, 6}, 1, now32)},
 			},
 		},
 		{
@@ -2818,8 +2818,8 @@ func TestEvalMultipleReturns(t *testing.T) {
 					&expr{val: 5, etype: etConst},
 				},
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric*", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric*", 0, 1}: []*MetricData{
 					makeResponse("metricA", []float64{21, 17, 20, 20, 10, 29}, 1, now32),
 					makeResponse("metricB", []float64{20, 18, 21, 19, 20, 20}, 1, now32),
 					makeResponse("metricC", []float64{19, 19, 21, 17, 23, 20}, 1, now32),
@@ -2829,10 +2829,10 @@ func TestEvalMultipleReturns(t *testing.T) {
 			},
 
 			"tukeyAbove",
-			map[string][]*metricData{
-				"metricA": []*metricData{makeResponse("metricA", []float64{21, 17, 20, 20, 10, 29}, 1, now32)},
-				"metricD": []*metricData{makeResponse("metricD", []float64{18, 20, 22, 14, 26, 20}, 1, now32)},
-				"metricE": []*metricData{makeResponse("metricE", []float64{17, 21, 8, 30, 18, 28}, 1, now32)},
+			map[string][]*MetricData{
+				"metricA": []*MetricData{makeResponse("metricA", []float64{21, 17, 20, 20, 10, 29}, 1, now32)},
+				"metricD": []*MetricData{makeResponse("metricD", []float64{18, 20, 22, 14, 26, 20}, 1, now32)},
+				"metricE": []*MetricData{makeResponse("metricE", []float64{17, 21, 8, 30, 18, 28}, 1, now32)},
 			},
 		},
 		{
@@ -2845,8 +2845,8 @@ func TestEvalMultipleReturns(t *testing.T) {
 					&expr{val: 5, etype: etConst},
 				},
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric*", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric*", 0, 1}: []*MetricData{
 					makeResponse("metricA", []float64{21, 17, 20, 20, 10, 29}, 1, now32),
 					makeResponse("metricB", []float64{20, 18, 21, 19, 20, 20}, 1, now32),
 					makeResponse("metricC", []float64{19, 19, 21, 17, 23, 20}, 1, now32),
@@ -2856,8 +2856,8 @@ func TestEvalMultipleReturns(t *testing.T) {
 			},
 
 			"tukeyAbove",
-			map[string][]*metricData{
-				"metricE": []*metricData{makeResponse("metricE", []float64{17, 21, 8, 30, 18, 28}, 1, now32)},
+			map[string][]*MetricData{
+				"metricE": []*MetricData{makeResponse("metricE", []float64{17, 21, 8, 30, 18, 28}, 1, now32)},
 			},
 		},
 		{
@@ -2870,8 +2870,8 @@ func TestEvalMultipleReturns(t *testing.T) {
 					&expr{val: 5, etype: etConst},
 				},
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric*", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric*", 0, 1}: []*MetricData{
 					makeResponse("metricA", []float64{21, 17, 20, 20, 10, 29}, 1, now32),
 					makeResponse("metricB", []float64{20, 18, 21, 19, 20, 20}, 1, now32),
 					makeResponse("metricC", []float64{19, 19, 21, 17, 23, 20}, 1, now32),
@@ -2881,9 +2881,9 @@ func TestEvalMultipleReturns(t *testing.T) {
 			},
 
 			"tukeyBelow",
-			map[string][]*metricData{
-				"metricA": []*metricData{makeResponse("metricA", []float64{21, 17, 20, 20, 10, 29}, 1, now32)},
-				"metricE": []*metricData{makeResponse("metricE", []float64{17, 21, 8, 30, 18, 28}, 1, now32)},
+			map[string][]*MetricData{
+				"metricA": []*MetricData{makeResponse("metricA", []float64{21, 17, 20, 20, 10, 29}, 1, now32)},
+				"metricE": []*MetricData{makeResponse("metricE", []float64{17, 21, 8, 30, 18, 28}, 1, now32)},
 			},
 		},
 		{
@@ -2896,8 +2896,8 @@ func TestEvalMultipleReturns(t *testing.T) {
 					&expr{val: 5, etype: etConst},
 				},
 			},
-			map[metricRequest][]*metricData{
-				metricRequest{"metric*", 0, 1}: []*metricData{
+			map[MetricRequest][]*MetricData{
+				MetricRequest{"metric*", 0, 1}: []*MetricData{
 					makeResponse("metricA", []float64{21, 17, 20, 20, 10, 29}, 1, now32),
 					makeResponse("metricB", []float64{20, 18, 21, 19, 20, 20}, 1, now32),
 					makeResponse("metricC", []float64{19, 19, 21, 17, 23, 20}, 1, now32),
@@ -2907,14 +2907,14 @@ func TestEvalMultipleReturns(t *testing.T) {
 			},
 
 			"tukeyBelow",
-			map[string][]*metricData{
-				"metricE": []*metricData{makeResponse("metricE", []float64{17, 21, 8, 30, 18, 28}, 1, now32)},
+			map[string][]*MetricData{
+				"metricE": []*MetricData{makeResponse("metricE", []float64{17, 21, 8, 30, 18, 28}, 1, now32)},
 			},
 		},
 	}
 
 	for _, tt := range tests {
-		g, err := evalExpr(tt.e, 0, 1, tt.m)
+		g, err := EvalExpr(tt.e, 0, 1, tt.m)
 		if err != nil {
 			t.Errorf("failed to eval %v: %s", tt.name, err)
 			continue
@@ -2999,7 +2999,7 @@ func TestEvalCustomFromUntil(t *testing.T) {
 
 	tests := []struct {
 		e     *expr
-		m     map[metricRequest][]*metricData
+		m     map[MetricRequest][]*MetricData
 		w     []float64
 		name  string
 		from  int32
@@ -3014,7 +3014,7 @@ func TestEvalCustomFromUntil(t *testing.T) {
 				},
 				argString: "footime",
 			},
-			map[metricRequest][]*metricData{},
+			map[MetricRequest][]*MetricData{},
 			[]float64{4200.0, 4260.0, 4320.0},
 			"footime",
 			4200,
@@ -3023,11 +3023,11 @@ func TestEvalCustomFromUntil(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		oldValues := map[metricRequest][]*metricData{}
+		oldValues := map[MetricRequest][]*MetricData{}
 		for key, metrics := range tt.m {
-			entry := []*metricData{}
+			entry := []*MetricData{}
 			for _, value := range metrics {
-				newValue := metricData{
+				newValue := MetricData{
 					FetchResponse: pb.FetchResponse{
 						Name:      value.Name,
 						StartTime: value.StartTime,
@@ -3046,7 +3046,7 @@ func TestEvalCustomFromUntil(t *testing.T) {
 			oldValues[key] = entry
 		}
 
-		g, err := evalExpr(tt.e, tt.from, tt.until, tt.m)
+		g, err := EvalExpr(tt.e, tt.from, tt.until, tt.m)
 		if err != nil {
 			t.Errorf("failed to eval %v: %s", tt.name, err)
 			continue
@@ -3103,7 +3103,7 @@ func nearlyEqual(a []float64, absent []bool, b []float64) bool {
 	return true
 }
 
-func nearlyEqualMetrics(a, b *metricData) bool {
+func nearlyEqualMetrics(a, b *MetricData) bool {
 
 	if len(a.IsAbsent) != len(b.IsAbsent) {
 		return false

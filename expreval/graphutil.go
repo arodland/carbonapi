@@ -1,4 +1,4 @@
-package main
+package expreval
 
 import (
 	"image/color"

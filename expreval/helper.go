@@ -1,4 +1,4 @@
-package main
+package expreval
 
 import (
 	"errors"
@@ -7,10 +7,16 @@ import (
 	"time"
 )
 
+var timeNow = time.Now
+
 var errUnknownTimeUnits = errors.New("unknown time units")
 
+var timeFormats = []string{"15:04 20060102", "20060102", "01/02/06"}
+
+var DefaultTimeZone = time.Local
+
 // dateParamToEpoch turns a passed string parameter into a unix epoch
-func dateParamToEpoch(s string, d int64) int32 {
+func DateParamToEpoch(s string, d int64) int32 {
 
 	if s == "" {
 		// return the default if nothing was passed
@@ -42,7 +48,7 @@ func dateParamToEpoch(s string, d int64) int32 {
 	}
 
 	for _, format := range timeFormats {
-		t, err := time.ParseInLocation(format, s, defaultTimeZone)
+		t, err := time.ParseInLocation(format, s, DefaultTimeZone)
 		if err == nil {
 			return int32(t.Unix())
 		}
@@ -110,7 +116,7 @@ func intervalString(s string, defaultSign int) (int32, error) {
 	return totalInterval, nil
 }
 
-func truthyBool(s string) bool {
+func TruthyBool(s string) bool {
 	switch s {
 	case "", "0", "false", "False", "no", "No":
 		return false

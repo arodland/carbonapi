@@ -19,6 +19,8 @@ import (
 	"github.com/dgryski/carbonzipper/mlog"
 	"github.com/dgryski/carbonzipper/mstats"
 
+	"github.com/dgryski/carbonapi/expreval"
+
 	"github.com/bradfitz/gomemcache/memcache"
 	ecache "github.com/dgryski/go-expirecache"
 	"github.com/peterbourgon/g2g"
@@ -53,10 +55,6 @@ var BuildVersion = "(development build)"
 
 var queryCache bytesCache
 var findCache bytesCache
-
-var timeFormats = []string{"15:04 20060102", "20060102", "01/02/06"}
-
-var defaultTimeZone = time.Local
 
 var logger mlog.Level
 
@@ -140,7 +138,7 @@ func renderHandler(w http.ResponseWriter, r *http.Request, stats *renderStats) {
 	from := r.FormValue("from")
 	until := r.FormValue("until")
 	format := r.FormValue("format")
-	useCache := truthyBool(r.FormValue("noCache")) == false
+	useCache := expreval.TruthyBool(r.FormValue("noCache")) == false
 
 	var jsonp string
 
@@ -149,7 +147,7 @@ func renderHandler(w http.ResponseWriter, r *http.Request, stats *renderStats) {
 		jsonp = r.FormValue("jsonp")
 	}
 
-	if format == "" && (truthyBool(r.FormValue("rawData")) || truthyBool(r.FormValue("rawdata"))) {
+	if format == "" && (expreval.TruthyBool(r.FormValue("rawData")) || expreval.TruthyBool(r.FormValue("rawdata"))) {
 		format = "raw"
 	}
 
@@ -189,20 +187,20 @@ func renderHandler(w http.ResponseWriter, r *http.Request, stats *renderStats) {
 
 	// normalize from and until values
 	// BUG(dgryski): doesn't handle timezones the same as graphite-web
-	from32 := dateParamToEpoch(from, timeNow().Add(-24*time.Hour).Unix())
-	until32 := dateParamToEpoch(until, timeNow().Unix())
+	from32 := expreval.DateParamToEpoch(from, timeNow().Add(-24*time.Hour).Unix())
+	until32 := expreval.DateParamToEpoch(until, timeNow().Unix())
 	if from32 == until32 {
 		http.Error(w, "Invalid empty time range", http.StatusBadRequest)
 		return
 	}
 
-	var results []*metricData
+	var results []*expreval.MetricData
 	var errors []string
-	metricMap := make(map[metricRequest][]*metricData)
+	metricMap := make(map[expreval.MetricRequest][]*expreval.MetricData)
 
 	for _, target := range targets {
 
-		exp, e, err := parseExpr(target)
+		exp, e, err := expreval.ParseExpr(target)
 
 		if err != nil || e != "" {
 			msg := buildParseErrorString(target, e, err)
@@ -210,11 +208,11 @@ func renderHandler(w http.ResponseWriter, r *http.Request, stats *renderStats) {
 			return
 		}
 
-		for _, m := range exp.metrics() {
+		for _, m := range exp.Metrics() {
 
 			mfetch := m
-			mfetch.from += from32
-			mfetch.until += until32
+			mfetch.From += from32
+			mfetch.Until += until32
 
 			if _, ok := metricMap[mfetch]; ok {
 				// already fetched this metric for this request
@@ -224,7 +222,7 @@ func renderHandler(w http.ResponseWriter, r *http.Request, stats *renderStats) {
 			var glob pb.GlobResponse
 			var haveCacheData bool
 
-			if response, ok := findCache.get(m.metric); useCache && ok {
+			if response, ok := findCache.get(m.Metric); useCache && ok {
 				Metrics.FindCacheHits.Add(1)
 				err := glob.Unmarshal(response)
 				haveCacheData = err == nil
@@ -234,20 +232,20 @@ func renderHandler(w http.ResponseWriter, r *http.Request, stats *renderStats) {
 				var err error
 				Metrics.FindRequests.Add(1)
 				stats.zipperRequests++
-				glob, err = Zipper.Find(m.metric)
+				glob, err = Zipper.Find(m.Metric)
 				if err != nil {
-					logger.Logf("Find: %v: %v", m.metric, err)
+					logger.Logf("Find: %v: %v", m.Metric, err)
 					continue
 				}
 				b, err := glob.Marshal()
 				if err == nil {
-					findCache.set(m.metric, b, 5*60)
+					findCache.set(m.Metric, b, 5*60)
 				}
 			}
 
 			// For each metric returned in the Find response, query Render
 			// This is a conscious decision to *not* cache render data
-			rch := make(chan *metricData, len(glob.GetMatches()))
+			rch := make(chan *expreval.MetricData, len(glob.GetMatches()))
 			leaves := 0
 			for _, m := range glob.GetMatches() {
 				if !m.GetIsLeaf() {
@@ -258,7 +256,7 @@ func renderHandler(w http.ResponseWriter, r *http.Request, stats *renderStats) {
 				Limiter.enter()
 				stats.zipperRequests++
 				go func(m *pb.GlobMatch, from, until int32) {
-					var rptr *metricData
+					var rptr *expreval.MetricData
 					r, err := Zipper.Render(m.GetPath(), from, until)
 					if err == nil {
 						rptr = &r
@@ -267,7 +265,7 @@ func renderHandler(w http.ResponseWriter, r *http.Request, stats *renderStats) {
 					}
 					rch <- rptr
 					Limiter.leave()
-				}(m, mfetch.from, mfetch.until)
+				}(m, mfetch.From, mfetch.Until)
 			}
 
 			for i := 0; i < leaves; i++ {
@@ -286,7 +284,7 @@ func renderHandler(w http.ResponseWriter, r *http.Request, stats *renderStats) {
 					logger.Logf("panic during eval: %s: %s\n%s\n", cacheKey, r, string(buf[:]))
 				}
 			}()
-			exprs, err := evalExpr(exp, from32, until32, metricMap)
+			exprs, err := expreval.EvalExpr(exp, from32, until32, metricMap)
 			if err != nil {
 				errors = append(errors, target+": "+err.Error())
 				return
@@ -305,17 +303,17 @@ func renderHandler(w http.ResponseWriter, r *http.Request, stats *renderStats) {
 
 	switch format {
 	case "json":
-		body = marshalJSON(results)
+		body = expreval.MarshalJSON(results)
 	case "protobuf":
-		body = marshalProtobuf(results)
+		body = expreval.MarshalProtobuf(results)
 	case "raw":
-		body = marshalRaw(results)
+		body = expreval.MarshalRaw(results)
 	case "csv":
-		body = marshalCSV(results)
+		body = expreval.MarshalCSV(results)
 	case "pickle":
-		body = marshalPickle(results)
+		body = expreval.MarshalPickle(results)
 	case "png":
-		body = marshalPNG(r, results)
+		body = expreval.MarshalPNG(r, results)
 	}
 
 	writeResponse(w, body, format, jsonp)
@@ -589,8 +587,8 @@ func main() {
 			logger.Fatalf("unable to parse seconds: %s: %s", fields[1], err)
 		}
 
-		defaultTimeZone = time.FixedZone(fields[0], offs)
-		logger.Logf("using fixed timezone %s, offset %d ", defaultTimeZone.String(), offs)
+		expreval.DefaultTimeZone = time.FixedZone(fields[0], offs)
+		logger.Logf("using fixed timezone %s, offset %d ", expreval.DefaultTimeZone.String(), offs)
 	}
 
 	if *cpus != 0 {

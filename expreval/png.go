@@ -1,6 +1,6 @@
 // +build !cairo
 
-package main
+package expreval
 
 import (
 	"bytes"
@@ -18,7 +18,7 @@ import (
 	vgdraw "github.com/gonum/plot/vg/draw"
 )
 
-func marshalPNG(r *http.Request, results []*metricData) []byte {
+func MarshalPNG(r *http.Request, results []*MetricData) []byte {
 	p, err := plot.New()
 	if err != nil {
 		panic(err)
@@ -193,12 +193,12 @@ func hexToColor(h string) color.Color {
 }
 
 type ResponsePlotter struct {
-	Response *metricData
+	Response *MetricData
 	vgdraw.LineStyle
 	lineMode string
 }
 
-func NewResponsePlotter(r *metricData) *ResponsePlotter {
+func NewResponsePlotter(r *MetricData) *ResponsePlotter {
 	return &ResponsePlotter{
 		Response:  r,
 		LineStyle: plotter.DefaultLineStyle,
